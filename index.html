@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>StudyHub Chest</title>
     
-    <!-- PWA Настройки -->
     <meta name="theme-color" content="#16a34a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <!-- JSZip для PPTX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <!-- Firebase SDK (v10) -->
@@ -36,36 +34,35 @@
         window.docRef = docRef;
         window.setDoc = setDoc;
 
-        // 🚀 ОДНОКРАТНОЕ ВОССТАНОВЛЕНИЕ ПРИ СТАРТЕ (Облако -> Сайт)
-        async function loadDataFromCloudOnStart() {
-            window.updateCloudStatus('⏳ Загрузка из облака...');
+        // Восстановление при старте (если локально пусто, пробуем загрузить из облака)
+        async function syncCloudOnStart() {
+            if (!window.docRef) return;
             try {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const cloudData = docSnap.data().treeData;
-                    if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+                    const localData = localStorage.getItem('studyhub_chest_local_data');
+
+                    // Если в локале ничего нет, а в облаке есть — берем из облака
+                    if (!localData && cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
                         window.treeData = cloudData;
                         window.saveToLocalStorage();
                         window.renderTree();
-                        if (window.treeData[0]) {
-                            const firstId = window.treeData[0]?.children?.[0]?.children?.[0]?.children?.[0]?.id || window.treeData[0]?.id;
-                            window.openFile(firstId);
-                        }
                         window.updateCloudStatus('🟢 Восстановлено из облака');
                         return;
                     }
                 }
-                window.updateCloudStatus('🟢 Загружено (Локально)');
+                window.updateCloudStatus('🟢 Данные загружены');
             } catch (error) {
-                console.warn('Ошибка загрузки из облака, работаем офлайн:', error);
+                console.warn('Офлайн режим или ошибка облака:', error);
                 window.updateCloudStatus('🟡 Офлайн режим');
             }
         }
 
-        window.loadDataFromCloudOnStart = loadDataFromCloudOnStart;
+        window.syncCloudOnStart = syncCloudOnStart;
     </script>
 
-   <style>
+    <style>
         :root {
             --bg-main: #f8fafc;
             --sidebar-bg: #ffffff;
@@ -587,7 +584,7 @@
         <div class="brand">
             <span>🧰 StudyHub</span>
         </div>
-        <div class="sync-badge" id="syncStatus">🟡 Подключение...</div>
+        <div class="sync-badge" id="syncStatus">🟢 Готово</div>
 
         <div class="folder-tree" id="treeContainer"></div>
         <button class="add-root-btn" onclick="addNode(null, 'chest')">+ Новый Раздел</button>
@@ -723,7 +720,7 @@
         </div>
     </div>
 
-   <script>
+    <script>
         const LOCAL_STORAGE_KEY = 'studyhub_chest_local_data';
 
         const defaultTreeData = [
@@ -766,7 +763,7 @@
         window.saveToLocalStorage = saveToLocalStorage;
 
         window.treeData = loadFromLocalStorage() || defaultTreeData;
-        window.activeFileId = '1-1-1-1';
+        window.activeFileId = window.treeData[0]?.children?.[0]?.children?.[0]?.children?.[0]?.id || window.treeData[0]?.id || '1';
 
         let activePageId = 'p1';
         let activeCanvasId = 'c1';
@@ -795,24 +792,24 @@
         };
 
         function updateCloudStatus(text) {
-            document.getElementById('syncStatus').innerText = text;
+            const el = document.getElementById('syncStatus');
+            if (el) el.innerText = text;
         }
         window.updateCloudStatus = updateCloudStatus;
 
-        // 📤 ТОЛЬКО ОТПРАВКА С САЙТА В ОБЛАКО
         function saveToCloud() {
             saveCurrentContent();
             saveToLocalStorage();
 
             if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
 
-            updateCloudStatus('🟡 Сохранение в облако...');
+            updateCloudStatus('🟡 Сохранение...');
 
             saveDebounceTimer = setTimeout(() => {
                 if (window.docRef && window.setDoc) {
                     window.setDoc(window.docRef, { treeData: window.treeData }, { merge: true })
                         .then(() => {
-                            updateCloudStatus('🟢 Сохранено в облако');
+                            updateCloudStatus('🟢 Сохранено в облаке');
                         })
                         .catch(() => {
                             updateCloudStatus('🟢 Сохранено локально');
@@ -820,7 +817,7 @@
                 } else {
                     updateCloudStatus('🟢 Сохранено локально');
                 }
-            }, 600);
+            }, 500);
         }
         window.saveToCloud = saveToCloud;
 
@@ -837,6 +834,7 @@
 
         function renderTree() {
             const container = document.getElementById('treeContainer');
+            if (!container) return;
             container.innerHTML = '';
             container.appendChild(buildTreeDOM(window.treeData, true));
         }
@@ -1177,7 +1175,7 @@
                 return;
             }
 
-            output.innerText = "⏳ Отправка кода на сервер компиляции...";
+            output.innerText = "⏳ Отправка кода на сервер...";
 
             try {
                 const response = await fetch('https://emkc.org/api/v2/piston/execute', {
@@ -1196,10 +1194,10 @@
                     let result = resData.run.output || "Код выполнен без вывода.";
                     output.innerText = result;
                 } else {
-                    output.innerText = "❌ Ошибка компилятора или вызова API.";
+                    output.innerText = "❌ Ошибка компиляции.";
                 }
             } catch (err) {
-                output.innerText = "❌ Ошибка подключения к серверу выполнения кода:\n" + err.message;
+                output.innerText = "❌ Ошибка сети: " + err.message;
             }
         }
 
@@ -1333,13 +1331,13 @@
             saveToCloud();
         }
 
-        /* 📊 ПАРСЕР ПРЕЗЕНТАЦИЙ (.PPTX) */
+        /* 📊 PPTX */
         async function handlePptxUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
 
             const viewer = document.getElementById('slideViewer');
-            viewer.innerText = "⏳ Загрузка и чтение файлов презентации...";
+            viewer.innerText = "⏳ Загрузка слайдов...";
 
             try {
                 const zip = await JSZip.loadAsync(file);
@@ -1353,7 +1351,7 @@
                 });
 
                 if (slideFiles.length === 0) {
-                    viewer.innerText = "❌ Не удалось найти слайды в файле PPTX.";
+                    viewer.innerText = "❌ Не удалось найти слайды.";
                     return;
                 }
 
@@ -1374,15 +1372,14 @@
                         if (pText.trim()) slideLines.push(pText.trim());
                     }
 
-                    currentSlides.push(slideLines.join("\n") || "[Слайд без текста]");
+                    currentSlides.push(slideLines.join("\n") || "[Пустой слайд]");
                 }
 
                 currentSlideIdx = 0;
                 renderSlide();
                 saveToCloud();
             } catch (err) {
-                console.error(err);
-                viewer.innerText = "❌ Ошибка при открытии файла .pptx: " + err.message;
+                viewer.innerText = "❌ Ошибка чтения .pptx";
             }
         }
 
@@ -1547,10 +1544,11 @@
 
         window.onload = async () => {
             renderTree();
-            if (window.loadDataFromCloudOnStart) {
-                await window.loadDataFromCloudOnStart();
+            openFile(window.activeFileId);
+            if (window.syncCloudOnStart) {
+                await window.syncCloudOnStart();
             }
         };
-</script>
+    </script>
 </body>
 </html>
