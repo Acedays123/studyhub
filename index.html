@@ -16,7 +16,7 @@
     <!-- Firebase SDK (v10) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB821A-_b8JwDzzB801qhbPMy64CMT2_hI",
@@ -36,23 +36,33 @@
         window.docRef = docRef;
         window.setDoc = setDoc;
 
-        // Синхронизация без затирания локальных вкладок
-        onSnapshot(docRef, (docSnap) => {
-            if (window.isLocalEditing || (Date.now() - (window.lastLocalChangeTime || 0) < 4000)) return;
-            
-            if (docSnap.exists()) {
-                const cloudData = docSnap.data().treeData;
-                if (cloudData && JSON.stringify(cloudData) !== JSON.stringify(window.treeData)) {
-                    window.treeData = cloudData;
-                    window.saveToLocalStorage();
-                    window.renderTree();
-                    window.openFile(window.activeFileId);
-                    window.updateCloudStatus('🟢 Облако обновлено');
+        // 🚀 ОДНОКРАТНОЕ ВОССТАНОВЛЕНИЕ ПРИ СТАРТЕ (Облако -> Сайт)
+        async function loadDataFromCloudOnStart() {
+            window.updateCloudStatus('⏳ Загрузка из облака...');
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const cloudData = docSnap.data().treeData;
+                    if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+                        window.treeData = cloudData;
+                        window.saveToLocalStorage();
+                        window.renderTree();
+                        if (window.treeData[0]) {
+                            const firstId = window.treeData[0]?.children?.[0]?.children?.[0]?.children?.[0]?.id || window.treeData[0]?.id;
+                            window.openFile(firstId);
+                        }
+                        window.updateCloudStatus('🟢 Восстановлено из облака');
+                        return;
+                    }
                 }
+                window.updateCloudStatus('🟢 Загружено (Локально)');
+            } catch (error) {
+                console.warn('Ошибка загрузки из облака, работаем офлайн:', error);
+                window.updateCloudStatus('🟡 Офлайн режим');
             }
-        }, (error) => {
-            window.updateCloudStatus('🟡 Офлайн режим');
-        });
+        }
+
+        window.loadDataFromCloudOnStart = loadDataFromCloudOnStart;
     </script>
 
    <style>
@@ -577,7 +587,7 @@
         <div class="brand">
             <span>🧰 StudyHub</span>
         </div>
-        <div class="sync-badge" id="syncStatus">🟡 Синхронизация...</div>
+        <div class="sync-badge" id="syncStatus">🟡 Подключение...</div>
 
         <div class="folder-tree" id="treeContainer"></div>
         <button class="add-root-btn" onclick="addNode(null, 'chest')">+ Новый Раздел</button>
@@ -757,8 +767,6 @@
 
         window.treeData = loadFromLocalStorage() || defaultTreeData;
         window.activeFileId = '1-1-1-1';
-        window.isLocalEditing = false;
-        window.lastLocalChangeTime = 0;
 
         let activePageId = 'p1';
         let activeCanvasId = 'c1';
@@ -791,36 +799,28 @@
         }
         window.updateCloudStatus = updateCloudStatus;
 
-        function markLocalChange() {
-            window.lastLocalChangeTime = Date.now();
-            saveToLocalStorage();
-        }
-
+        // 📤 ТОЛЬКО ОТПРАВКА С САЙТА В ОБЛАКО
         function saveToCloud() {
             saveCurrentContent();
-            markLocalChange();
+            saveToLocalStorage();
 
             if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
 
-            updateCloudStatus('🟡 Сохранение...');
-            window.isLocalEditing = true;
+            updateCloudStatus('🟡 Сохранение в облако...');
 
             saveDebounceTimer = setTimeout(() => {
                 if (window.docRef && window.setDoc) {
                     window.setDoc(window.docRef, { treeData: window.treeData }, { merge: true })
                         .then(() => {
-                            updateCloudStatus('🟢 Сохранено');
-                            window.isLocalEditing = false;
+                            updateCloudStatus('🟢 Сохранено в облако');
                         })
                         .catch(() => {
                             updateCloudStatus('🟢 Сохранено локально');
-                            window.isLocalEditing = false;
                         });
                 } else {
                     updateCloudStatus('🟢 Сохранено локально');
-                    window.isLocalEditing = false;
                 }
-            }, 500);
+            }, 600);
         }
         window.saveToCloud = saveToCloud;
 
@@ -1150,7 +1150,6 @@
             loadActivePageOrCanvas();
         }
 
-        /* 💻 ИСПРАВЛЕННЫЙ И РЕАЛЬНО РАБОТАЮЩИЙ КОМПИЛЯТОР */
         function changeCodeLang() {
             const selectEl = document.getElementById('codeLangSelect');
             const newLang = selectEl.value;
@@ -1334,7 +1333,7 @@
             saveToCloud();
         }
 
-        /* 📊 ИСПРАВЛЕННЫЙ ПАРСЕР ПРЕЗЕНТАЦИЙ (.PPTX) */
+        /* 📊 ПАРСЕР ПРЕЗЕНТАЦИЙ (.PPTX) */
         async function handlePptxUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -1346,7 +1345,6 @@
                 const zip = await JSZip.loadAsync(file);
                 currentSlides = [];
                 
-                // Фильтруем все XML слайды и сортируем по номерам
                 const slideFiles = Object.keys(zip.files).filter(fileName => /^ppt\/slides\/slide\d+\.xml$/i.test(fileName));
                 slideFiles.sort((a, b) => {
                     const numA = parseInt(a.match(/\d+/)[0]);
@@ -1547,11 +1545,10 @@
             saveToLocalStorage();
         });
 
-        window.onload = () => {
+        window.onload = async () => {
             renderTree();
-            if (window.treeData && window.treeData.length > 0) {
-                const firstId = window.treeData[0]?.children?.[0]?.children?.[0]?.children?.[0]?.id || window.treeData[0]?.id;
-                if (firstId) window.openFile(firstId);
+            if (window.loadDataFromCloudOnStart) {
+                await window.loadDataFromCloudOnStart();
             }
         };
 </script>
