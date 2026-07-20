@@ -39,20 +39,23 @@
 
         // Синхронизация в реальном времени (Realtime listener)
         onSnapshot(docRef, (docSnap) => {
+            if (window.isLocalEditing) return; // Не перебивать, если пользователь активно пишет/рисует
+            
             if (docSnap.exists()) {
                 const cloudData = docSnap.data().treeData;
                 if (cloudData && JSON.stringify(cloudData) !== JSON.stringify(window.treeData)) {
                     window.treeData = cloudData;
+                    window.saveToLocalStorage();
                     window.renderTree();
                     window.openFile(window.activeFileId);
-                    window.updateCloudStatus('🟢 Синхронизировано');
+                    window.updateCloudStatus('🟢 Синхронизировано с облаком');
                 }
             } else {
                 window.saveToCloud();
             }
         }, (error) => {
             console.error("Firebase sync error:", error);
-            window.updateCloudStatus('🔴 Ошибка сети (Офлайн)');
+            window.updateCloudStatus('🟡 Локальный режим (Офлайн)');
         });
     </script>
 
@@ -744,8 +747,10 @@
     </div>
 
    <script>
-        // ИНИЦИАЛИЗАЦИЯ ДАННЫХ
-        window.treeData = [
+        // ИНИЦИАЛИЗАЦИЯ ДАННЫХ И ДВОЙНОГО СОХРАНЕНИЯ
+        const LOCAL_STORAGE_KEY = 'studyhub_chest_local_data';
+
+        const defaultTreeData = [
             {
                 id: '1', name: 'Учеба', type: 'chest', icon: '🧰', collapsed: false, children: [
                     { 
@@ -768,7 +773,29 @@
             }
         ];
 
+        function loadFromLocalStorage() {
+            try {
+                const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : null;
+            } catch(e) {
+                console.error("Local Storage Read Error", e);
+                return null;
+            }
+        }
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.treeData));
+            } catch(e) {
+                console.error("Local Storage Write Error", e);
+            }
+        }
+        window.saveToLocalStorage = saveToLocalStorage;
+
+        window.treeData = loadFromLocalStorage() || defaultTreeData;
         window.activeFileId = '1-1-1-1';
+        window.isLocalEditing = false;
+
         let activePageId = 'p1';
         let activeCanvasId = 'c1';
         let currentMode = 'text';
@@ -796,16 +823,29 @@
 
         function saveToCloud() {
             saveCurrentContent();
+            saveToLocalStorage(); // 1. Мгновенно пишем в устройство
+
             if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
 
             updateCloudStatus('🟡 Сохранение...');
+            window.isLocalEditing = true;
+
             saveDebounceTimer = setTimeout(() => {
                 if (window.docRef && window.setDoc) {
                     window.setDoc(window.docRef, { treeData: window.treeData }, { merge: true })
-                        .then(() => updateCloudStatus('🟢 Синхронизировано'))
-                        .catch(() => updateCloudStatus('🔴 Ошибка сохранения'));
+                        .then(() => {
+                            updateCloudStatus('🟢 Синхронизировано');
+                            window.isLocalEditing = false;
+                        })
+                        .catch(() => {
+                            updateCloudStatus('🟡 Сохранено локально');
+                            window.isLocalEditing = false;
+                        });
+                } else {
+                    updateCloudStatus('🟢 Сохранено локально');
+                    window.isLocalEditing = false;
                 }
-            }, 800);
+            }, 500);
         }
         window.saveToCloud = saveToCloud;
 
@@ -933,7 +973,8 @@
         }
 
         function openFile(id) {
-            saveToCloud(); // Гарантируем отправку последних изменений
+            saveCurrentContent();
+            saveToLocalStorage();
             window.activeFileId = id;
             const file = findNode(window.treeData, id);
             if (!file) return;
@@ -1104,7 +1145,7 @@
 
         /* РЕЖИМЫ */
         function setMode(mode) {
-            saveToCloud(); // Гарантируем синхронизацию при переключении инструмента
+            saveToCloud();
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
@@ -1153,7 +1194,7 @@
                 if (file) file.codeLang = newLang;
                 saveToCloud();
             } else {
-                selectEl.value = currentLang; // Откатываем выбор обратно
+                selectEl.value = currentLang;
             }
         }
 
@@ -1177,7 +1218,7 @@
                 } catch (err) {
                     output.innerText = "❌ Ошибка выполнения:\n" + err.message;
                 } finally {
-                    console.log = originalLog; // Всегда восстанавливаем логгер
+                    console.log = originalLog;
                 }
             } else {
                 output.innerText = `[Компиляция/Запуск (${lang.toUpperCase()})]\n-----------------------------------\n` + 
@@ -1511,6 +1552,12 @@
             reader.readAsText(file);
         }
 
+        // Страховка сохранения перед выходом
+        window.addEventListener('beforeunload', () => {
+            saveCurrentContent();
+            saveToLocalStorage();
+        });
+
         // РЕГИСТРАЦИЯ PWA SERVICE WORKER
         if ('serviceWorker' in navigator) {
             const swCode = `
@@ -1523,7 +1570,10 @@
 
         window.onload = () => {
             renderTree();
-            openFile(window.activeFileId);
+            if (window.treeData && window.treeData.length > 0) {
+                const firstId = window.treeData[0]?.children?.[0]?.children?.[0]?.children?.[0]?.id || window.treeData[0]?.id;
+                if (firstId) window.openFile(firstId);
+            }
         };
 </script>
 </body>
