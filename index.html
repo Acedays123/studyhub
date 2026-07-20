@@ -9,10 +9,9 @@
     <meta name="theme-color" content="#16a34a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="StudyHub">
 
     <!-- JSZip для PPTX -->
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <!-- Firebase SDK (v10) -->
     <script type="module">
@@ -37,9 +36,9 @@
         window.docRef = docRef;
         window.setDoc = setDoc;
 
-        // Синхронизация в реальном времени (Realtime listener)
+        // Синхронизация без затирания локальных вкладок
         onSnapshot(docRef, (docSnap) => {
-            if (window.isLocalEditing) return; // Не перебивать, если пользователь активно пишет/рисует
+            if (window.isLocalEditing || (Date.now() - (window.lastLocalChangeTime || 0) < 4000)) return;
             
             if (docSnap.exists()) {
                 const cloudData = docSnap.data().treeData;
@@ -48,14 +47,11 @@
                     window.saveToLocalStorage();
                     window.renderTree();
                     window.openFile(window.activeFileId);
-                    window.updateCloudStatus('🟢 Синхронизировано с облаком');
+                    window.updateCloudStatus('🟢 Облако обновлено');
                 }
-            } else {
-                window.saveToCloud();
             }
         }, (error) => {
-            console.error("Firebase sync error:", error);
-            window.updateCloudStatus('🟡 Локальный режим (Офлайн)');
+            window.updateCloudStatus('🟡 Офлайн режим');
         });
     </script>
 
@@ -86,9 +82,8 @@
             overflow: hidden;
         }
 
-        /* БОКОВАЯ ПАНЕЛЬ */
         sidebar {
-            width: 330px;
+            width: 320px;
             background: var(--sidebar-bg);
             border-right: 2px solid var(--border);
             display: flex;
@@ -162,7 +157,7 @@
             cursor: pointer;
         }
 
-        .node-actions { display: flex; gap: 2px; opacity: 0.2; transition: opacity 0.2s; }
+        .node-actions { display: flex; gap: 2px; opacity: 0.3; transition: opacity 0.2s; }
         .node-header:hover .node-actions { opacity: 1; }
 
         .action-btn {
@@ -210,7 +205,6 @@
             cursor: pointer;
         }
 
-        /* ОСНОВНОЙ ЭКРАН */
         main {
             flex-grow: 1;
             display: flex;
@@ -258,7 +252,6 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.06);
         }
 
-        /* ВКАДКИ ЛИСТОВ И ХОЛСТОВ */
         .sub-tabs-bar {
             display: flex;
             align-items: center;
@@ -303,7 +296,6 @@
             cursor: pointer;
         }
 
-        /* ПАНЕЛЬ ФОРМАТИРОВАНИЯ */
         .format-toolbar {
             display: flex;
             gap: 8px;
@@ -354,7 +346,6 @@
             font-family: inherit;
         }
 
-        /* Canvas */
         .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; }
         .canvas-tools {
             padding: 8px 12px;
@@ -384,7 +375,6 @@
             transform-origin: 0 0;
         }
 
-        /* Сократитель */
         .compressor-wrapper {
             padding: 18px;
             height: 100%;
@@ -421,7 +411,6 @@
         .expanded-blue { text-decoration: none; font-style: italic; color: var(--layer-blue); font-weight: 500; }
         .expanded-green { text-decoration: none; font-style: italic; color: var(--layer-green); font-weight: 500; }
 
-        /* Презентации */
         .pptx-wrapper {
             display: flex;
             flex-direction: column;
@@ -457,9 +446,10 @@
         .pptx-slide-content {
             max-width: 100%;
             max-height: 100%;
-            font-size: 20px;
+            font-size: 18px;
             line-height: 1.6;
             white-space: pre-wrap;
+            color: #1e293b;
         }
 
         .footer-bar {
@@ -471,7 +461,6 @@
             color: var(--text-muted);
         }
 
-        /* МОДАЛЬНОЕ ОКНО */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.4);
@@ -507,7 +496,6 @@
 
         .hidden { display: none !important; }
 
-        /* РЕДАКТОР КОДА И КОНСОЛЬ */
         .code-wrapper {
             display: flex;
             flex-direction: column;
@@ -537,19 +525,9 @@
             font-weight: 600;
         }
 
-        .code-toolbar button:hover {
-            background: #45475a;
-        }
-
-        .code-toolbar .btn-run {
-            background: #16a34a;
-            color: white;
-            border: none;
-        }
-
-        .code-toolbar .btn-run:hover {
-            background: #15803d;
-        }
+        .code-toolbar button:hover { background: #45475a; }
+        .code-toolbar .btn-run { background: #16a34a; color: white; border: none; }
+        .code-toolbar .btn-run:hover { background: #15803d; }
 
         .code-editor-area {
             flex: 2;
@@ -585,7 +563,6 @@
             font-weight: bold;
         }
 
-        /* МОБИЛЬНАЯ АДАПТАЦИЯ */
         @media (max-width: 768px) {
             body { flex-direction: column; }
             sidebar { width: 100%; height: 220px; border-right: none; border-bottom: 2px solid var(--border); }
@@ -596,7 +573,6 @@
 </head>
 <body>
 
-    <!-- Сайдбар -->
     <sidebar>
         <div class="brand">
             <span>🧰 StudyHub</span>
@@ -608,12 +584,11 @@
         
         <div class="backup-tools">
             <button class="backup-btn" onclick="exportData()">💾 Бэкап</button>
-            <button class="backup-btn" onclick="document.getElementById('importFileInput').click()">📂 Восстановить</button>
+            <button class="backup-btn" onclick="document.getElementById('importFileInput').click()">📂 Импорт</button>
             <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importData(event)">
         </div>
     </sidebar>
 
-    <!-- Главная зона -->
     <main>
         <header>
             <div class="current-path" id="currentPath">Открыто: <span>...</span></div>
@@ -627,10 +602,8 @@
             </div>
         </header>
 
-        <!-- Вкладки листов/холстов -->
         <div class="sub-tabs-bar" id="subTabsBar"></div>
 
-        <!-- Панель форматирования -->
         <div class="format-toolbar" id="formatToolbar">
             <select id="fontFamily" onchange="applyStyle()">
                 <option value="'Segoe UI', sans-serif">Segoe UI</option>
@@ -650,10 +623,8 @@
         </div>
 
         <div class="work-area">
-            <!-- 1. Текстовый редактор -->
             <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Разметка сжатия:&#10;• Синее: Слово [оригинальное описание]&#10;• Зелёное: (сжатая фраза) {оригинальная фраза}"></textarea>
 
-            <!-- 2. Рисование -->
             <div id="drawEditor" class="canvas-wrapper hidden">
                 <div class="canvas-tools">
                     <label>Цвет: <input type="color" id="brushColor" value="#16a34a"></label>
@@ -667,7 +638,6 @@
                 </div>
             </div>
 
-            <!-- 3. Сократитель -->
             <div id="compressEditor" class="compressor-wrapper hidden">
                 <div class="compressor-legend">
                     <div><span class="layer-blue">Слово</span> [описание]</div>
@@ -676,7 +646,6 @@
                 <div class="compressor-output" id="outputBook"></div>
             </div>
 
-            <!-- 4. Презентации -->
             <div id="pptxEditor" class="pptx-wrapper hidden">
                 <div class="pptx-controls">
                     <input type="file" id="pptxFileInput" accept=".pptx" style="display: none;" onchange="handlePptxUpload(event)">
@@ -690,7 +659,6 @@
                 </div>
             </div>
 
-            <!-- 5. Редактор кода -->
             <div id="codeEditor" class="code-wrapper hidden">
                 <div class="code-toolbar">
                     <label style="color:#cdd6f4;">Язык: 
@@ -719,7 +687,6 @@
         </div>
     </main>
 
-    <!-- Модальное окно -->
     <div id="settingsModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3>⚙️ Настройка элемента</h3>
@@ -747,7 +714,6 @@
     </div>
 
    <script>
-        // ИНИЦИАЛИЗАЦИЯ ДАННЫХ И ДВОЙНОГО СОХРАНЕНИЯ
         const LOCAL_STORAGE_KEY = 'studyhub_chest_local_data';
 
         const defaultTreeData = [
@@ -778,7 +744,6 @@
                 const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
                 return stored ? JSON.parse(stored) : null;
             } catch(e) {
-                console.error("Local Storage Read Error", e);
                 return null;
             }
         }
@@ -786,15 +751,14 @@
         function saveToLocalStorage() {
             try {
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.treeData));
-            } catch(e) {
-                console.error("Local Storage Write Error", e);
-            }
+            } catch(e) {}
         }
         window.saveToLocalStorage = saveToLocalStorage;
 
         window.treeData = loadFromLocalStorage() || defaultTreeData;
         window.activeFileId = '1-1-1-1';
         window.isLocalEditing = false;
+        window.lastLocalChangeTime = 0;
 
         let activePageId = 'p1';
         let activeCanvasId = 'c1';
@@ -802,12 +766,10 @@
         let editingNodeId = null;
         let saveDebounceTimer = null;
 
-        // Трансформации холста
         let canvasOffsetX = 0, canvasOffsetY = 0, canvasScale = 1;
         let isPanning = false, startX, startY;
         let currentSlides = [], currentSlideIdx = 0;
 
-        // Шаблоны кода
         const CODE_TEMPLATES = {
             cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}`,
             python: `print("Hello, World!")`,
@@ -816,14 +778,27 @@
             csharp: `using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello, World!");\n    }\n}`
         };
 
+        const PISTON_LANG_MAP = {
+            cpp: { language: 'c++', version: '10.2.0' },
+            python: { language: 'python', version: '3.10.0' },
+            java: { language: 'java', version: '15.0.2' },
+            javascript: { language: 'javascript', version: '18.15.0' },
+            csharp: { language: 'csharp', version: '6.12.0' }
+        };
+
         function updateCloudStatus(text) {
             document.getElementById('syncStatus').innerText = text;
         }
         window.updateCloudStatus = updateCloudStatus;
 
+        function markLocalChange() {
+            window.lastLocalChangeTime = Date.now();
+            saveToLocalStorage();
+        }
+
         function saveToCloud() {
             saveCurrentContent();
-            saveToLocalStorage(); // 1. Мгновенно пишем в устройство
+            markLocalChange();
 
             if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
 
@@ -834,11 +809,11 @@
                 if (window.docRef && window.setDoc) {
                     window.setDoc(window.docRef, { treeData: window.treeData }, { merge: true })
                         .then(() => {
-                            updateCloudStatus('🟢 Синхронизировано');
+                            updateCloudStatus('🟢 Сохранено');
                             window.isLocalEditing = false;
                         })
                         .catch(() => {
-                            updateCloudStatus('🟡 Сохранено локально');
+                            updateCloudStatus('🟢 Сохранено локально');
                             window.isLocalEditing = false;
                         });
                 } else {
@@ -928,7 +903,7 @@
             if (!name) return;
 
             const newNode = {
-                id: Date.now().toString(),
+                id: 'node_' + Date.now() + '_' + Math.floor(Math.random()*1000),
                 name: name.trim(),
                 type: type,
                 icon: type === 'scroll' ? '📜' : (type === 'bundle' ? '🎒' : '🧰'),
@@ -974,7 +949,6 @@
 
         function openFile(id) {
             saveCurrentContent();
-            saveToLocalStorage();
             window.activeFileId = id;
             const file = findNode(window.treeData, id);
             if (!file) return;
@@ -984,10 +958,6 @@
             }
             if (!file.canvases || file.canvases.length === 0) {
                 file.canvases = [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }];
-            }
-            if (file.codeSnippet === undefined) {
-                file.codeSnippet = CODE_TEMPLATES.cpp;
-                file.codeLang = 'cpp';
             }
 
             activePageId = file.pages[0].id;
@@ -1143,7 +1113,6 @@
             file.slides = currentSlides;
         }
 
-        /* РЕЖИМЫ */
         function setMode(mode) {
             saveToCloud();
             currentMode = mode;
@@ -1181,7 +1150,7 @@
             loadActivePageOrCanvas();
         }
 
-        /* ЛОГИКА РЕДАКТОРА КОДА */
+        /* 💻 ИСПРАВЛЕННЫЙ И РЕАЛЬНО РАБОТАЮЩИЙ КОМПИЛЯТОР */
         function changeCodeLang() {
             const selectEl = document.getElementById('codeLangSelect');
             const newLang = selectEl.value;
@@ -1189,7 +1158,7 @@
             const currentLang = file ? (file.codeLang || 'cpp') : 'cpp';
             const area = document.getElementById('codeTextArea');
 
-            if (!area.value.trim() || confirm("Заменить текущий код шаблоном для " + newLang.toUpperCase() + "?")) {
+            if (!area.value.trim() || confirm("Заменить код шаблоном для " + newLang.toUpperCase() + "?")) {
                 area.value = CODE_TEMPLATES[newLang] || '';
                 if (file) file.codeLang = newLang;
                 saveToCloud();
@@ -1198,45 +1167,52 @@
             }
         }
 
-        function runCode() {
-            const lang = document.getElementById('codeLangSelect').value;
+        async function runCode() {
+            const langKey = document.getElementById('codeLangSelect').value;
             const code = document.getElementById('codeTextArea').value;
             const output = document.getElementById('codeOutput');
-            
-            output.innerText = "Выполнение...";
+            const config = PISTON_LANG_MAP[langKey];
 
-            if (lang === 'javascript') {
-                const originalLog = console.log;
-                try {
-                    let logs = [];
-                    console.log = (...args) => {
-                        logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
-                    };
-                    
-                    new Function(code)();
-                    output.innerText = logs.length > 0 ? logs.join('\n') : "[Выполнено без вывода]";
-                } catch (err) {
-                    output.innerText = "❌ Ошибка выполнения:\n" + err.message;
-                } finally {
-                    console.log = originalLog;
+            if (!code.trim()) {
+                output.innerText = "⚠️ Код пуст!";
+                return;
+            }
+
+            output.innerText = "⏳ Отправка кода на сервер компиляции...";
+
+            try {
+                const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        language: config.language,
+                        version: config.version,
+                        files: [{ content: code }]
+                    })
+                });
+
+                const resData = await response.json();
+
+                if (resData.run) {
+                    let result = resData.run.output || "Код выполнен без вывода.";
+                    output.innerText = result;
+                } else {
+                    output.innerText = "❌ Ошибка компилятора или вызова API.";
                 }
-            } else {
-                output.innerText = `[Компиляция/Запуск (${lang.toUpperCase()})]\n-----------------------------------\n` + 
-                                   `Код сохранён и готов к компиляции.\n(Для локального выполнения C++/Python/Java используйте соответствующую среду разработки, либо скачайте файл кнопкой справа).`;
+            } catch (err) {
+                output.innerText = "❌ Ошибка подключения к серверу выполнения кода:\n" + err.message;
             }
         }
 
         function downloadCodeFile() {
             const lang = document.getElementById('codeLangSelect').value;
             const code = document.getElementById('codeTextArea').value;
-            
             const extMap = { cpp: 'cpp', python: 'py', java: 'java', javascript: 'js', csharp: 'cs' };
-            const ext = extMap[lang] || 'txt';
             
             const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `main.${ext}`;
+            link.download = `main.${extMap[lang] || 'txt'}`;
             link.click();
         }
 
@@ -1244,7 +1220,6 @@
             saveToCloud();
         });
 
-        /* НАСТРОЙКИ МОДАЛКИ */
         function openModal(nodeId, e) {
             e.stopPropagation();
             editingNodeId = nodeId;
@@ -1278,7 +1253,7 @@
             saveToCloud();
         }
 
-        /* РИСОВАНИЕ С ZOOM И PAN */
+        /* 🎨 CANVAS */
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d');
         const canvasContainer = document.getElementById('canvasContainer');
@@ -1359,40 +1334,57 @@
             saveToCloud();
         }
 
-        /* ПРЕЗЕНТАЦИИ */
+        /* 📊 ИСПРАВЛЕННЫЙ ПАРСЕР ПРЕЗЕНТАЦИЙ (.PPTX) */
         async function handlePptxUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
 
+            const viewer = document.getElementById('slideViewer');
+            viewer.innerText = "⏳ Загрузка и чтение файлов презентации...";
+
             try {
                 const zip = await JSZip.loadAsync(file);
                 currentSlides = [];
-                let slideIndex = 1;
+                
+                // Фильтруем все XML слайды и сортируем по номерам
+                const slideFiles = Object.keys(zip.files).filter(fileName => /^ppt\/slides\/slide\d+\.xml$/i.test(fileName));
+                slideFiles.sort((a, b) => {
+                    const numA = parseInt(a.match(/\d+/)[0]);
+                    const numB = parseInt(b.match(/\d+/)[0]);
+                    return numA - numB;
+                });
 
-                while (true) {
-                    const slidePath = `ppt/slides/slide${slideIndex}.xml`;
-                    const slideFile = zip.file(slidePath);
-                    if (!slideFile) break;
+                if (slideFiles.length === 0) {
+                    viewer.innerText = "❌ Не удалось найти слайды в файле PPTX.";
+                    return;
+                }
 
-                    const slideXmlText = await slideFile.async("string");
+                for (let slidePath of slideFiles) {
+                    const slideXmlText = await zip.file(slidePath).async("string");
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(slideXmlText, "text/xml");
                     
-                    const textNodes = xmlDoc.getElementsByTagName("a:t");
-                    let slideText = "";
-                    for (let node of textNodes) {
-                        slideText += node.textContent + " ";
+                    const paragraphs = xmlDoc.getElementsByTagName("a:p");
+                    let slideLines = [];
+
+                    for (let p of paragraphs) {
+                        let pText = "";
+                        const texts = p.getElementsByTagName("a:t");
+                        for (let t of texts) {
+                            pText += t.textContent;
+                        }
+                        if (pText.trim()) slideLines.push(pText.trim());
                     }
 
-                    currentSlides.push(slideText.trim() || `[Слайд ${slideIndex}: Только изображения или пустой]`);
-                    slideIndex++;
+                    currentSlides.push(slideLines.join("\n") || "[Слайд без текста]");
                 }
 
                 currentSlideIdx = 0;
                 renderSlide();
                 saveToCloud();
             } catch (err) {
-                alert("Ошибка чтения PPTX.");
+                console.error(err);
+                viewer.innerText = "❌ Ошибка при открытии файла .pptx: " + err.message;
             }
         }
 
@@ -1424,7 +1416,7 @@
             }
         }
 
-        /* СОКРАТИШЕЛЬ */
+        /* ⚡ СОКРАТИШЕЛЬ */
         function generateBook() {
             const file = findNode(window.treeData, window.activeFileId);
             if (!file) return;
@@ -1480,7 +1472,6 @@
             }
         }
 
-        /* ТЕКСТОВОЕ ФОРМАТИРОВАНИЕ */
         function toggleFormat(styleType) {
             const file = findNode(window.treeData, window.activeFileId);
             if (!file) return;
@@ -1519,7 +1510,6 @@
             document.getElementById('wordCount').innerText = val.trim() ? val.trim().split(/\s+/).length : 0;
         }
 
-        // ЭКСПОРТ И ИМПОРТ
         function exportData() {
             saveCurrentContent();
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.treeData));
@@ -1552,21 +1542,10 @@
             reader.readAsText(file);
         }
 
-        // Страховка сохранения перед выходом
         window.addEventListener('beforeunload', () => {
             saveCurrentContent();
             saveToLocalStorage();
         });
-
-        // РЕГИСТРАЦИЯ PWA SERVICE WORKER
-        if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', e => self.skipWaiting());
-                self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
-            `;
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
-        }
 
         window.onload = () => {
             renderTree();
