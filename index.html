@@ -34,7 +34,6 @@
         window.docRef = docRef;
         window.setDoc = setDoc;
 
-        // Восстановление при старте (если локально пусто, пробуем загрузить из облака)
         async function syncCloudOnStart() {
             if (!window.docRef) return;
             try {
@@ -43,11 +42,11 @@
                     const cloudData = docSnap.data().treeData;
                     const localData = localStorage.getItem('studyhub_chest_local_data');
 
-                    // Если в локале ничего нет, а в облаке есть — берем из облака
                     if (!localData && cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
                         window.treeData = cloudData;
                         window.saveToLocalStorage();
                         window.renderTree();
+                        window.openFile(window.treeData[0]?.id || '1');
                         window.updateCloudStatus('🟢 Восстановлено из облака');
                         return;
                     }
@@ -784,11 +783,11 @@
         };
 
         const PISTON_LANG_MAP = {
-            cpp: { language: 'c++', version: '10.2.0' },
-            python: { language: 'python', version: '3.10.0' },
-            java: { language: 'java', version: '15.0.2' },
-            javascript: { language: 'javascript', version: '18.15.0' },
-            csharp: { language: 'csharp', version: '6.12.0' }
+            cpp: { language: 'c++', version: '10.2.0', file: 'main.cpp' },
+            python: { language: 'python', version: '3.10.0', file: 'main.py' },
+            java: { language: 'java', version: '15.0.2', file: 'Main.java' },
+            javascript: { language: 'javascript', version: '18.15.0', file: 'main.js' },
+            csharp: { language: 'csharp', version: '6.12.0', file: 'main.cs' }
         };
 
         function updateCloudStatus(text) {
@@ -1052,17 +1051,18 @@
             if (currentMode === 'text' || currentMode === 'compress') {
                 const page = file.pages.find(p => p.id === activePageId) || file.pages[0];
                 if (page) {
+                    activePageId = page.id;
                     const editor = document.getElementById('textEditor');
-                    editor.value = page.text || '';
+                    editor.value = page.text !== undefined ? page.text : '';
                     editor.style.fontWeight = page.isBold ? 'bold' : 'normal';
                     editor.style.fontStyle = page.isItalic ? 'italic' : 'normal';
                     editor.style.textDecoration = page.isUnderline ? 'underline' : 'none';
                     editor.style.fontFamily = page.font || "'Segoe UI', sans-serif";
                     editor.style.fontSize = page.size || "16px";
 
-                    document.getElementById('btnBold').classList.toggle('active', page.isBold);
-                    document.getElementById('btnItalic').classList.toggle('active', page.isItalic);
-                    document.getElementById('btnUnderline').classList.toggle('active', page.isUnderline);
+                    document.getElementById('btnBold').classList.toggle('active', !!page.isBold);
+                    document.getElementById('btnItalic').classList.toggle('active', !!page.isItalic);
+                    document.getElementById('btnUnderline').classList.toggle('active', !!page.isUnderline);
                     document.getElementById('fontFamily').value = page.font || "'Segoe UI', sans-serif";
                     document.getElementById('fontSize').value = page.size || "16px";
                 }
@@ -1070,6 +1070,8 @@
 
             if (currentMode === 'draw') {
                 const canvasObj = file.canvases.find(c => c.id === activeCanvasId) || file.canvases[0];
+                if (canvasObj) activeCanvasId = canvasObj.id;
+
                 const canvas = document.getElementById('paintCanvas');
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1083,7 +1085,7 @@
             }
 
             if (currentMode === 'code') {
-                document.getElementById('codeTextArea').value = file.codeSnippet || CODE_TEMPLATES.cpp;
+                document.getElementById('codeTextArea').value = file.codeSnippet !== undefined ? file.codeSnippet : CODE_TEMPLATES.cpp;
                 document.getElementById('codeLangSelect').value = file.codeLang || 'cpp';
             }
 
@@ -1095,12 +1097,18 @@
             const file = findNode(window.treeData, window.activeFileId);
             if (!file) return;
 
-            const page = file.pages ? file.pages.find(p => p.id === activePageId) : null;
+            if (!file.pages) file.pages = [];
+            let page = file.pages.find(p => p.id === activePageId);
+            if (!page && file.pages.length > 0) page = file.pages[0];
+            
             if (page) {
                 page.text = document.getElementById('textEditor').value;
             }
 
-            const canvasObj = file.canvases ? file.canvases.find(c => c.id === activeCanvasId) : null;
+            if (!file.canvases) file.canvases = [];
+            let canvasObj = file.canvases.find(c => c.id === activeCanvasId);
+            if (!canvasObj && file.canvases.length > 0) canvasObj = file.canvases[0];
+
             if (canvasObj) {
                 const canvas = document.getElementById('paintCanvas');
                 canvasObj.draw = canvas.toDataURL();
@@ -1184,7 +1192,7 @@
                     body: JSON.stringify({
                         language: config.language,
                         version: config.version,
-                        files: [{ content: code }]
+                        files: [{ name: config.file, content: code }]
                     })
                 });
 
@@ -1193,6 +1201,8 @@
                 if (resData.run) {
                     let result = resData.run.output || "Код выполнен без вывода.";
                     output.innerText = result;
+                } else if (resData.message) {
+                    output.innerText = "❌ Ошибка API: " + resData.message;
                 } else {
                     output.innerText = "❌ Ошибка компиляции.";
                 }
