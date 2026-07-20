@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StudyHub Chest</title>
+    
+    <!-- PWA Настройки -->
+    <meta name="theme-color" content="#16a34a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StudyHub">
+
+    <!-- JSZip для PPTX -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <!-- Firebase SDK (v10) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // Ключи из вашего проекта Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyB821A-_b8JwDzzB801qhbPMy64CMT2_hI",
+            authDomain: "studyhub-e9c6c.firebaseapp.com",
+            projectId: "studyhub-e9c6c",
+            storageBucket: "studyhub-e9c6c.firebasestorage.app",
+            messagingSenderId: "873113897575",
+            appId: "1:873113897575:web:a20c2d799da5268891e2c2",
+            measurementId: "G-S170S42DQN"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const docRef = doc(db, "studyhub_data", "main_user_store");
+
+        window.db = db;
+        window.docRef = docRef;
+        window.setDoc = setDoc;
+
+        // Синхронизация в реальном времени (Realtime listener)
+        onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const cloudData = docSnap.data().treeData;
+                if (cloudData && JSON.stringify(cloudData) !== JSON.stringify(window.treeData)) {
+                    window.treeData = cloudData;
+                    window.renderTree();
+                    window.openFile(window.activeFileId);
+                    window.updateCloudStatus('🟢 Синхронизировано');
+                }
+            } else {
+                window.saveToCloud(); // Если база пустая, отправляем начальные данные
+            }
+        }, (error) => {
+            console.error("Firebase sync error:", error);
+            window.updateCloudStatus('🔴 Ошибка сети (Офлайн)');
+        });
+    </script>
+
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --sidebar-bg: #ffffff;
+            --primary: #16a34a;
+            --primary-hover: #15803d;
+            --primary-light: #f0fdf4;
+            --active-bg: #dcfce7;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+
+            --layer-blue: #0056b3;
+            --layer-green: #1e7e34;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; touch-action: manipulation; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* БОКОВАЯ ПАНЕЛЬ */
+        sidebar {
+            width: 330px;
+            background: var(--sidebar-bg);
+            border-right: 2px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            flex-shrink: 0;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.02);
+            z-index: 20;
+        }
+
+        .brand {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sync-badge {
+            font-size: 11px;
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .folder-tree { flex-grow: 1; overflow-y: auto; }
+
+        .tree-node {
+            margin-left: 8px;
+            border-left: 2px solid #cbd5e1;
+            padding-left: 4px;
+            margin-top: 4px;
+        }
+
+        .tree-node.root-level { margin-left: 0; border-left: none; padding-left: 0; }
+
+        .node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+            background: #ffffff;
+        }
+
+        .node-header:hover { background: var(--bg-main); }
+        .node-header.active {
+            background: var(--active-bg);
+            color: var(--primary-hover);
+            font-weight: 700;
+        }
+
+        .node-title { display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+        .toggle-arrow {
+            display: inline-block;
+            width: 14px;
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .node-actions { display: flex; gap: 2px; opacity: 0.2; transition: opacity 0.2s; }
+        .node-header:hover .node-actions { opacity: 1; }
+
+        .action-btn {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--text-dark);
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .action-btn:hover { background: var(--primary-light); color: var(--primary); }
+
+        .add-root-btn {
+            width: 100%;
+            background: var(--primary-light);
+            color: var(--primary);
+            border: 2px dashed var(--primary);
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .backup-tools {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .backup-btn {
+            flex: 1;
+            padding: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        /* ОСНОВНОЙ ЭКРАН */
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px 20px;
+            height: 100vh;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .current-path { font-size: 15px; font-weight: 700; }
+        .current-path span { color: var(--primary); }
+
+        .mode-tabs {
+            display: flex;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: 8px;
+            gap: 4px;
+            overflow-x: auto;
+        }
+
+        .mode-btn {
+            background: none;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .mode-btn.active {
+            background: #ffffff;
+            color: var(--primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+
+        /* ВКАДКИ ЛИСТОВ И ХОЛСТОВ */
+        .sub-tabs-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            padding: 6px 12px;
+            border: 2px solid var(--border);
+            border-bottom: none;
+            border-radius: 10px 10px 0 0;
+            overflow-x: auto;
+        }
+
+        .tab-item {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .tab-item.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .tab-add-btn {
+            background: var(--primary-light);
+            color: var(--primary);
+            border: 1px dashed var(--primary);
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* ПАНЕЛЬ ФОРМАТИРОВАНИЯ */
+        .format-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #f8fafc;
+            padding: 6px 12px;
+            border: 2px solid var(--border);
+            border-bottom: none;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+
+        .format-toolbar select, .format-toolbar button {
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .format-toolbar button.active {
+            background: var(--active-bg);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .work-area {
+            flex-grow: 1;
+            position: relative;
+            background: #ffffff;
+            border: 2px solid var(--border);
+            border-radius: 0 0 10px 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            padding: 18px;
+            font-size: 16px;
+            line-height: 1.7;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+        }
+
+        /* Canvas (Интерактивный с Zoom) */
+        .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; }
+        .canvas-tools {
+            padding: 8px 12px;
+            background: var(--bg-main);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 10;
+            overflow-x: auto;
+        }
+        .canvas-container {
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+            background: #cbd5e1;
+            cursor: crosshair;
+        }
+        canvas { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            background: #ffffff; 
+            box-shadow: 0 0 25px rgba(0,0,0,0.15); 
+            transform-origin: 0 0;
+        }
+
+        /* Сократитель */
+        .compressor-wrapper {
+            padding: 18px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .compressor-legend {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--bg-main);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .compressor-output {
+            flex-grow: 1;
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            white-space: pre-line;
+            overflow-y: auto;
+            line-height: 1.8;
+        }
+
+        .layer-blue { color: var(--layer-blue); text-decoration: underline dashed var(--layer-blue); cursor: pointer; font-weight: 600; }
+        .layer-green { color: var(--layer-green); text-decoration: underline dashed var(--layer-green); cursor: pointer; font-weight: 600; }
+        .expanded-blue { text-decoration: none; font-style: italic; color: var(--layer-blue); font-weight: 500; }
+        .expanded-green { text-decoration: none; font-style: italic; color: var(--layer-green); font-weight: 500; }
+
+        /* Презентации */
+        .pptx-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 15px;
+            gap: 10px;
+            background: #f8fafc;
+        }
+
+        .pptx-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .pptx-slide-box {
+            flex-grow: 1;
+            background: white;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            position: relative;
+            padding: 20px;
+        }
+
+        .pptx-slide-content {
+            max-width: 100%;
+            max-height: 100%;
+            font-size: 20px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .footer-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* МОДАЛЬНОЕ ОКНО */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            width: 320px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .modal-content h3 { font-size: 16px; color: var(--text-dark); }
+        .modal-content input { padding: 8px; border: 1px solid var(--border); border-radius: 6px; outline: none; }
+        
+        .icon-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+        .icon-opt {
+            font-size: 18px; padding: 6px; border: 1px solid var(--border);
+            border-radius: 6px; cursor: pointer; transition: 0.1s;
+        }
+        .icon-opt:hover { background: var(--primary-light); border-color: var(--primary); }
+
+        .modal-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 5px; }
+        .modal-btns button { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-save { background: var(--primary); color: white; }
+        .btn-cancel { background: #e2e8f0; color: var(--text-dark); }
+
+        .hidden { display: none !important; }
+
+        /* МОБИЛЬНАЯ АДАПТАЦИЯ */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            sidebar { width: 100%; height: 220px; border-right: none; border-bottom: 2px solid var(--border); }
+            main { height: calc(100vh - 220px); padding: 10px; }
+            .node-actions { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Сайдбар -->
+    <sidebar>
+        <div class="brand">
+            <span>🧰 StudyHub</span>
+        </div>
+        <div class="sync-badge" id="syncStatus">🟡 Синхронизация...</div>
+
+        <div class="folder-tree" id="treeContainer"></div>
+        <button class="add-root-btn" onclick="addNode(null, 'chest')">+ Новый Раздел</button>
+        
+        <div class="backup-tools">
+            <button class="backup-btn" onclick="exportData()">💾 Бэкап</button>
+            <button class="backup-btn" onclick="document.getElementById('importFileInput').click()">📂 Восстановить</button>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importData(event)">
+        </div>
+    </sidebar>
+
+    <!-- Главная зона -->
+    <main>
+        <header>
+            <div class="current-path" id="currentPath">Открыто: <span>...</span></div>
+
+            <div class="mode-tabs">
+                <button class="mode-btn active" id="btn-text" onclick="setMode('text')">📜 Заметки</button>
+                <button class="mode-btn" id="btn-draw" onclick="setMode('draw')">🎨 Рисование</button>
+                <button class="mode-btn" id="btn-compress" onclick="setMode('compress')">⚡ Сократитель</button>
+                <button class="mode-btn" id="btn-pptx" onclick="setMode('pptx')">📊 Презентация</button>
+            </div>
+        </header>
+
+        <!-- Вкладки листов/холстов -->
+        <div class="sub-tabs-bar" id="subTabsBar"></div>
+
+        <!-- Панель форматирования -->
+        <div class="format-toolbar" id="formatToolbar">
+            <select id="fontFamily" onchange="applyStyle()">
+                <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Times New Roman', serif">Times New Roman</option>
+                <option value="monospace">Monospace</option>
+            </select>
+            <select id="fontSize" onchange="applyStyle()">
+                <option value="14px">14px</option>
+                <option value="16px" selected>16px</option>
+                <option value="18px">18px</option>
+                <option value="22px">22px</option>
+            </select>
+            <button id="btnBold" onclick="toggleFormat('bold')"><b>B</b></button>
+            <button id="btnItalic" onclick="toggleFormat('italic')"><i>I</i></button>
+            <button id="btnUnderline" onclick="toggleFormat('underline')"><u>U</u></button>
+        </div>
+
+        <div class="work-area">
+            <!-- 1. Текстовый редактор -->
+            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Разметка сжатия:&#10;• Синее: Слово [оригинальное описание]&#10;• Зелёное: (сжатая фраза) {оригинальная фраза}"></textarea>
+
+            <!-- 2. Рисование (С Zoom и Pan) -->
+            <div id="drawEditor" class="canvas-wrapper hidden">
+                <div class="canvas-tools">
+                    <label>Цвет: <input type="color" id="brushColor" value="#16a34a"></label>
+                    <label>Толщина: <input type="range" id="brushSize" min="1" max="25" value="4"></label>
+                    <span id="zoomIndicator">100%</span>
+                    <button class="action-btn" onclick="resetCanvasView()">🎯 Сброс (100%)</button>
+                    <button class="action-btn" onclick="clearCanvas()">🧹 Очистить</button>
+                </div>
+                <div class="canvas-container" id="canvasContainer">
+                    <canvas id="paintCanvas" width="4000" height="4000"></canvas>
+                </div>
+            </div>
+
+            <!-- 3. Сократитель -->
+            <div id="compressEditor" class="compressor-wrapper hidden">
+                <div class="compressor-legend">
+                    <div><span class="layer-blue">Слово</span> [описание]</div>
+                    <div><span class="layer-green">(Сжатая фраза)</span> {оригинал}</div>
+                </div>
+                <div class="compressor-output" id="outputBook"></div>
+            </div>
+
+            <!-- 4. Презентации -->
+            <div id="pptxEditor" class="pptx-wrapper hidden">
+                <div class="pptx-controls">
+                    <input type="file" id="pptxFileInput" accept=".pptx" style="display: none;" onchange="handlePptxUpload(event)">
+                    <button class="action-btn" onclick="document.getElementById('pptxFileInput').click()">📂 Загрузить .pptx</button>
+                    <button class="action-btn" onclick="prevSlide()">◀ Назад</button>
+                    <span id="slideCounter" style="font-size: 13px; font-weight: 600;">Слайд 0 / 0</span>
+                    <button class="action-btn" onclick="nextSlide()">Вперед ▶</button>
+                </div>
+                <div class="pptx-slide-box">
+                    <div class="pptx-slide-content" id="slideViewer">Загрузите презентацию PowerPoint (.pptx), чтобы просматривать текст слайдов.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bar">
+            <div>Символов: <strong id="charCount">0</strong> | Слов: <strong id="wordCount">0</strong></div>
+            <div id="statusText" style="color: var(--primary); font-weight: 600;">Готово</div>
+        </div>
+    </main>
+
+    <!-- Модальное окно -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>⚙️ Настройка элемента</h3>
+            <label style="font-size: 12px; font-weight: 600;">Название:</label>
+            <input type="text" id="modalNameInput">
+            
+            <label style="font-size: 12px; font-weight: 600;">Иконка:</label>
+            <div class="icon-picker">
+                <span class="icon-opt" onclick="selectIcon('🧰')">🧰</span>
+                <span class="icon-opt" onclick="selectIcon('🎒')">🎒</span>
+                <span class="icon-opt" onclick="selectIcon('📜')">📜</span>
+                <span class="icon-opt" onclick="selectIcon('📚')">📚</span>
+                <span class="icon-opt" onclick="selectIcon('🔖')">🔖</span>
+                <span class="icon-opt" onclick="selectIcon('📌')">📌</span>
+                <span class="icon-opt" onclick="selectIcon('📐')">📐</span>
+                <span class="icon-opt" onclick="selectIcon('💻')">💻</span>
+            </div>
+            <input type="text" id="modalIconInput" placeholder="Или введи любой emoji">
+
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="closeModal()">Отмена</button>
+                <button class="btn-save" onclick="saveModalSettings()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ИНИЦИАЛИЗАЦИЯ ДАННЫХ
+        window.treeData = [
+            {
+                id: '1', name: 'Учеба', type: 'chest', icon: '🧰', collapsed: false, children: [
+                    { 
+                        id: '1-1', name: 'Математика', type: 'bundle', icon: '📐', collapsed: false, children: [
+                            {
+                                id: '1-1-1', name: 'Алгебра', type: 'bundle', icon: '🎒', collapsed: false, children: [
+                                    {
+                                        id: '1-1-1-1', name: 'Заметки', type: 'scroll', icon: '📜',
+                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
+                                        canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
+                                        slides: []
+                                    }
+                                ]
+                            }
+                        ] 
+                    }
+                ]
+            }
+        ];
+
+        window.activeFileId = '1-1-1-1';
+        let activePageId = 'p1';
+        let activeCanvasId = 'c1';
+        let currentMode = 'text';
+        let editingNodeId = null;
+        let saveDebounceTimer = null;
+
+        // Трансформации холста
+        let canvasOffsetX = 0, canvasOffsetY = 0, canvasScale = 1;
+        let isPanning = false, startX, startY;
+        let currentSlides = [], currentSlideIdx = 0;
+
+        function updateCloudStatus(text) {
+            document.getElementById('syncStatus').innerText = text;
+        }
+        window.updateCloudStatus = updateCloudStatus;
+
+        function saveToCloud() {
+            saveCurrentContent();
+            if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+
+            updateCloudStatus('🟡 Сохранение...');
+            saveDebounceTimer = setTimeout(() => {
+                if (window.docRef && window.setDoc) {
+                    window.setDoc(window.docRef, { treeData: window.treeData }, { merge: true })
+                        .then(() => updateCloudStatus('🟢 Синхронизировано'))
+                        .catch(() => updateCloudStatus('🔴 Ошибка сохранения'));
+                }
+            }, 800);
+        }
+        window.saveToCloud = saveToCloud;
+
+        function findNode(nodes, id) {
+            for (let n of nodes) {
+                if (n.id === id) return n;
+                if (n.children) {
+                    let found = findNode(n.children, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        function renderTree() {
+            const container = document.getElementById('treeContainer');
+            container.innerHTML = '';
+            container.appendChild(buildTreeDOM(window.treeData, true));
+        }
+        window.renderTree = renderTree;
+
+        function buildTreeDOM(nodes, isRoot = false) {
+            const fragment = document.createDocumentFragment();
+            nodes.forEach(node => {
+                const div = document.createElement('div');
+                div.className = `tree-node ${isRoot ? 'root-level' : ''}`;
+
+                let defaultIcon = '📜';
+                if (node.type === 'chest') defaultIcon = '🧰';
+                if (node.type === 'bundle') defaultIcon = '🎒';
+
+                let icon = node.icon || defaultIcon;
+                let hasChildren = node.children && node.children.length > 0;
+                let arrow = hasChildren ? (node.collapsed ? '►' : '▼') : '•';
+
+                const header = document.createElement('div');
+                header.className = `node-header ${node.id === window.activeFileId ? 'active' : ''}`;
+                header.innerHTML = `
+                    <div class="node-title">
+                        <span class="toggle-arrow" onclick="toggleCollapse('${node.id}', event)">${arrow}</span>
+                        <span>${icon}</span> 
+                        <span>${node.name}</span>
+                    </div>
+                    <div class="node-actions">
+                        <button class="action-btn" onclick="openModal('${node.id}', event)">⚙️</button>
+                        <button class="action-btn" onclick="addNode('${node.id}', 'bundle', event)">+🎒</button>
+                        <button class="action-btn" onclick="addNode('${node.id}', 'scroll', event)">+📜</button>
+                        <button class="action-btn" onclick="deleteNode('${node.id}', event)">✕</button>
+                    </div>
+                `;
+
+                header.onclick = (e) => {
+                    if (!e.target.classList.contains('action-btn') && !e.target.classList.contains('toggle-arrow')) {
+                        openFile(node.id);
+                    }
+                };
+                div.appendChild(header);
+
+                if (hasChildren && !node.collapsed) {
+                    div.appendChild(buildTreeDOM(node.children, false));
+                }
+                fragment.appendChild(div);
+            });
+            return fragment;
+        }
+
+        function toggleCollapse(id, e) {
+            e.stopPropagation();
+            const node = findNode(window.treeData, id);
+            if (node) {
+                node.collapsed = !node.collapsed;
+                renderTree();
+                saveToCloud();
+            }
+        }
+
+        function addNode(parentId, type, e) {
+            if (e) e.stopPropagation();
+            const name = prompt('Название:');
+            if (!name) return;
+
+            const newNode = {
+                id: Date.now().toString(),
+                name: name.trim(),
+                type: type,
+                icon: type === 'scroll' ? '📜' : (type === 'bundle' ? '🎒' : '🧰'),
+                collapsed: false,
+                children: [],
+                pages: [{ id: 'p_' + Date.now(), name: 'Лист 1', text: '', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
+                canvases: [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }],
+                slides: []
+            };
+
+            if (!parentId) window.treeData.push(newNode);
+            else {
+                const parent = findNode(window.treeData, parentId);
+                if (parent) {
+                    if (!parent.children) parent.children = [];
+                    parent.children.push(newNode);
+                }
+            }
+
+            window.activeFileId = newNode.id;
+            renderTree();
+            openFile(newNode.id);
+            saveToCloud();
+        }
+
+        function deleteNode(id, e) {
+            if (e) e.stopPropagation();
+            if (confirm('Удалить этот раздел?')) {
+                window.treeData = removeFromTree(window.treeData, id);
+                renderTree();
+                saveToCloud();
+            }
+        }
+
+        function removeFromTree(nodes, id) {
+            return nodes.filter(n => n.id !== id).map(n => {
+                if (n.children) n.children = removeFromTree(n.children, id);
+                return n;
+            });
+        }
+
+        function openFile(id) {
+            saveCurrentContent();
+            window.activeFileId = id;
+            const file = findNode(window.treeData, id);
+            if (!file) return;
+
+            if (!file.pages || file.pages.length === 0) {
+                file.pages = [{ id: 'p_' + Date.now(), name: 'Лист 1', text: '', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }];
+            }
+            if (!file.canvases || file.canvases.length === 0) {
+                file.canvases = [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }];
+            }
+
+            activePageId = file.pages[0].id;
+            activeCanvasId = file.canvases[0].id;
+            currentSlides = file.slides || [];
+            currentSlideIdx = 0;
+
+            document.getElementById('currentPath').innerHTML = `Открыто: <span>${file.icon || '📜'} ${file.name}</span>`;
+
+            renderTree();
+            renderSubTabs();
+            loadActivePageOrCanvas();
+            renderSlide();
+        }
+        window.openFile = openFile;
+
+        function renderSubTabs() {
+            const file = findNode(window.treeData, window.activeFileId);
+            const container = document.getElementById('subTabsBar');
+            container.innerHTML = '';
+
+            if (!file) return;
+
+            if (currentMode === 'text' || currentMode === 'compress') {
+                file.pages.forEach(p => {
+                    const tab = document.createElement('div');
+                    tab.className = `tab-item ${p.id === activePageId ? 'active' : ''}`;
+                    tab.innerHTML = `📜 ${p.name} <span onclick="deleteSubTab('page', '${p.id}', event)">✕</span>`;
+                    tab.onclick = () => { saveCurrentContent(); activePageId = p.id; renderSubTabs(); loadActivePageOrCanvas(); };
+                    container.appendChild(tab);
+                });
+                const addBtn = document.createElement('button');
+                addBtn.className = 'tab-add-btn';
+                addBtn.innerText = '+ Лист';
+                addBtn.onclick = () => addSubTab('page');
+                container.appendChild(addBtn);
+            } else if (currentMode === 'draw') {
+                file.canvases.forEach(c => {
+                    const tab = document.createElement('div');
+                    tab.className = `tab-item ${c.id === activeCanvasId ? 'active' : ''}`;
+                    tab.innerHTML = `🎨 ${c.name} <span onclick="deleteSubTab('canvas', '${c.id}', event)">✕</span>`;
+                    tab.onclick = () => { saveCurrentContent(); activeCanvasId = c.id; renderSubTabs(); loadActivePageOrCanvas(); };
+                    container.appendChild(tab);
+                });
+                const addBtn = document.createElement('button');
+                addBtn.className = 'tab-add-btn';
+                addBtn.innerText = '+ Холст';
+                addBtn.onclick = () => addSubTab('canvas');
+                container.appendChild(addBtn);
+            }
+        }
+
+        function addSubTab(type) {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+
+            if (type === 'page') {
+                const count = file.pages.length + 1;
+                const newPage = { id: 'p_' + Date.now(), name: `Лист ${count}`, text: '', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" };
+                file.pages.push(newPage);
+                activePageId = newPage.id;
+            } else {
+                const count = file.canvases.length + 1;
+                const newCanvas = { id: 'c_' + Date.now(), name: `Холст ${count}`, draw: '' };
+                file.canvases.push(newCanvas);
+                activeCanvasId = newCanvas.id;
+            }
+            renderSubTabs();
+            loadActivePageOrCanvas();
+            saveToCloud();
+        }
+
+        function deleteSubTab(type, id, e) {
+            e.stopPropagation();
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+
+            if (type === 'page' && file.pages.length > 1) {
+                file.pages = file.pages.filter(p => p.id !== id);
+                activePageId = file.pages[0].id;
+            } else if (type === 'canvas' && file.canvases.length > 1) {
+                file.canvases = file.canvases.filter(c => c.id !== id);
+                activeCanvasId = file.canvases[0].id;
+            }
+            renderSubTabs();
+            loadActivePageOrCanvas();
+            saveToCloud();
+        }
+
+        function loadActivePageOrCanvas() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+
+            if (currentMode === 'text' || currentMode === 'compress') {
+                const page = file.pages.find(p => p.id === activePageId) || file.pages[0];
+                if (page) {
+                    const editor = document.getElementById('textEditor');
+                    editor.value = page.text || '';
+                    editor.style.fontWeight = page.isBold ? 'bold' : 'normal';
+                    editor.style.fontStyle = page.isItalic ? 'italic' : 'normal';
+                    editor.style.textDecoration = page.isUnderline ? 'underline' : 'none';
+                    editor.style.fontFamily = page.font || "'Segoe UI', sans-serif";
+                    editor.style.fontSize = page.size || "16px";
+
+                    document.getElementById('btnBold').classList.toggle('active', page.isBold);
+                    document.getElementById('btnItalic').classList.toggle('active', page.isItalic);
+                    document.getElementById('btnUnderline').classList.toggle('active', page.isUnderline);
+                    document.getElementById('fontFamily').value = page.font || "'Segoe UI', sans-serif";
+                    document.getElementById('fontSize').value = page.size || "16px";
+                }
+            }
+
+            if (currentMode === 'draw') {
+                const canvasObj = file.canvases.find(c => c.id === activeCanvasId) || file.canvases[0];
+                const canvas = document.getElementById('paintCanvas');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (canvasObj && canvasObj.draw) {
+                    let img = new Image();
+                    img.onload = () => ctx.drawImage(img, 0, 0);
+                    img.src = canvasObj.draw;
+                }
+                updateCanvasTransform();
+            }
+
+            updateStats();
+            if (currentMode === 'compress') generateBook();
+        }
+
+        function saveCurrentContent() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+
+            const page = file.pages ? file.pages.find(p => p.id === activePageId) : null;
+            if (page) {
+                page.text = document.getElementById('textEditor').value;
+            }
+
+            const canvasObj = file.canvases ? file.canvases.find(c => c.id === activeCanvasId) : null;
+            if (canvasObj) {
+                const canvas = document.getElementById('paintCanvas');
+                canvasObj.draw = canvas.toDataURL();
+            }
+
+            file.slides = currentSlides;
+        }
+
+        /* РЕЖИМЫ */
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${mode}`).classList.add('active');
+
+            document.getElementById('textEditor').classList.add('hidden');
+            document.getElementById('drawEditor').classList.add('hidden');
+            document.getElementById('compressEditor').classList.add('hidden');
+            document.getElementById('pptxEditor').classList.add('hidden');
+
+            if (mode === 'text') {
+                document.getElementById('textEditor').classList.remove('hidden');
+                document.getElementById('formatToolbar').classList.remove('hidden');
+            } else if (mode === 'compress') {
+                document.getElementById('compressEditor').classList.remove('hidden');
+                document.getElementById('formatToolbar').classList.remove('hidden');
+                generateBook();
+            } else if (mode === 'pptx') {
+                document.getElementById('pptxEditor').classList.remove('hidden');
+                document.getElementById('formatToolbar').classList.add('hidden');
+            } else {
+                document.getElementById('formatToolbar').classList.add('hidden');
+            }
+
+            if (mode === 'draw') {
+                document.getElementById('drawEditor').classList.remove('hidden');
+            }
+
+            renderSubTabs();
+            loadActivePageOrCanvas();
+        }
+
+        /* НАСТРОЙКИ МОДАЛКИ */
+        function openModal(nodeId, e) {
+            e.stopPropagation();
+            editingNodeId = nodeId;
+            const node = findNode(window.treeData, nodeId);
+            if (!node) return;
+
+            document.getElementById('modalNameInput').value = node.name;
+            document.getElementById('modalIconInput').value = node.icon || '';
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+            editingNodeId = null;
+        }
+
+        function selectIcon(icon) {
+            document.getElementById('modalIconInput').value = icon;
+        }
+
+        function saveModalSettings() {
+            if (!editingNodeId) return;
+            const node = findNode(window.treeData, editingNodeId);
+            if (node) {
+                node.name = document.getElementById('modalNameInput').value.trim() || node.name;
+                node.icon = document.getElementById('modalIconInput').value.trim() || node.icon;
+            }
+            closeModal();
+            renderTree();
+            openFile(window.activeFileId);
+            saveToCloud();
+        }
+
+        /* РИСОВАНИЕ С ZOOM И PAN */
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvasContainer');
+        let painting = false;
+
+        function updateCanvasTransform() {
+            canvas.style.transform = `translate(${canvasOffsetX}px, ${canvasOffsetY}px) scale(${canvasScale})`;
+            document.getElementById('zoomIndicator').innerText = `${Math.round(canvasScale * 100)}%`;
+        }
+
+        function resetCanvasView() {
+            canvasOffsetX = 0; canvasOffsetY = 0; canvasScale = 1;
+            updateCanvasTransform();
+        }
+
+        canvasContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 1.1;
+            const rect = canvasContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let newScale = e.deltaY < 0 ? canvasScale * zoomFactor : canvasScale / zoomFactor;
+            newScale = Math.min(Math.max(0.2, newScale), 5);
+
+            canvasOffsetX = mouseX - (mouseX - canvasOffsetX) * (newScale / canvasScale);
+            canvasOffsetY = mouseY - (mouseY - canvasOffsetY) * (newScale / canvasScale);
+            canvasScale = newScale;
+
+            updateCanvasTransform();
+        }, { passive: false });
+
+        canvasContainer.addEventListener('contextmenu', e => e.preventDefault());
+
+        canvasContainer.addEventListener('mousedown', (e) => {
+            if (e.button === 2 || e.button === 1) {
+                isPanning = true;
+                startX = e.clientX - canvasOffsetX;
+                startY = e.clientY - canvasOffsetY;
+            } else if (e.button === 0) {
+                painting = true;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isPanning = false;
+            if (painting) {
+                painting = false;
+                ctx.beginPath();
+                saveToCloud();
+            }
+        });
+
+        canvasContainer.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                canvasOffsetX = e.clientX - startX;
+                canvasOffsetY = e.clientY - startY;
+                updateCanvasTransform();
+            } else if (painting) {
+                const rect = canvas.getBoundingClientRect();
+                ctx.lineWidth = document.getElementById('brushSize').value;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = document.getElementById('brushColor').value;
+
+                const x = (e.clientX - rect.left) / canvasScale;
+                const y = (e.clientY - rect.top) / canvasScale;
+
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            }
+        });
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            saveToCloud();
+        }
+
+        /* ПРЕЗЕНТАЦИИ */
+        async function handlePptxUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+                currentSlides = [];
+                let slideIndex = 1;
+
+                while (true) {
+                    const slidePath = `ppt/slides/slide${slideIndex}.xml`;
+                    const slideFile = zip.file(slidePath);
+                    if (!slideFile) break;
+
+                    const slideXmlText = await slideFile.async("string");
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(slideXmlText, "text/xml");
+                    
+                    const textNodes = xmlDoc.getElementsByTagName("a:t");
+                    let slideText = "";
+                    for (let node of textNodes) {
+                        slideText += node.textContent + " ";
+                    }
+
+                    currentSlides.push(slideText.trim() || `[Слайд ${slideIndex}: Только изображения или пустой]`);
+                    slideIndex++;
+                }
+
+                currentSlideIdx = 0;
+                renderSlide();
+                saveToCloud();
+            } catch (err) {
+                alert("Ошибка чтения PPTX.");
+            }
+        }
+
+        function renderSlide() {
+            const viewer = document.getElementById('slideViewer');
+            const counter = document.getElementById('slideCounter');
+
+            if (!currentSlides || currentSlides.length === 0) {
+                viewer.innerText = "Загрузите презентацию PowerPoint (.pptx), чтобы просматривать текст слайдов.";
+                counter.innerText = "Слайд 0 / 0";
+                return;
+            }
+
+            viewer.innerText = currentSlides[currentSlideIdx];
+            counter.innerText = `Слайд ${currentSlideIdx + 1} / ${currentSlides.length}`;
+        }
+
+        function nextSlide() {
+            if (currentSlideIdx < currentSlides.length - 1) {
+                currentSlideIdx++;
+                renderSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIdx > 0) {
+                currentSlideIdx--;
+                renderSlide();
+            }
+        }
+
+        /* СОКРАТИШЕЛЬ */
+        function generateBook() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            const page = file.pages.find(p => p.id === activePageId) || file.pages[0];
+
+            let rawText = document.getElementById('textEditor').value;
+            const outputBox = document.getElementById('outputBook');
+            window.textDatabase = {}; 
+            let count = 0;
+
+            if (page) {
+                outputBox.style.fontFamily = page.font || "'Segoe UI', sans-serif";
+                outputBox.style.fontSize = page.size || "16px";
+                outputBox.style.fontWeight = page.isBold ? 'bold' : 'normal';
+                outputBox.style.fontStyle = page.isItalic ? 'italic' : 'normal';
+                outputBox.style.textDecoration = page.isUnderline ? 'underline' : 'none';
+            }
+
+            if (!rawText.trim()) {
+                outputBox.innerHTML = '<i>Лист пуст. Напишите текст в Заметках.</i>';
+                return;
+            }
+
+            let blueRegex = /([^\s\[\](){}]+)\s*\[([^\]]+)\]/g;
+            rawText = rawText.replace(blueRegex, (match, shortWord, fullText) => {
+                count++;
+                let id = `b_${count}`;
+                window.textDatabase[id] = { short: shortWord, full: fullText.trim(), type: 'blue' };
+                return `<span id="${id}" class="layer-blue" ondblclick="toggleLayer('${id}')">${shortWord}</span>`;
+            });
+
+            let greenRegex = /\(([^)]+)\)\s*\{([^}]+)\}/g;
+            rawText = rawText.replace(greenRegex, (match, shortPhrase, fullPhrase) => {
+                count++;
+                let id = `g_${count}`;
+                window.textDatabase[id] = { short: shortPhrase.trim(), full: fullPhrase.trim(), type: 'green' };
+                return `<span id="${id}" class="layer-green" ondblclick="toggleLayer('${id}')">${shortPhrase.trim()}</span>`;
+            });
+
+            outputBox.innerHTML = rawText;
+        }
+
+        function toggleLayer(id) {
+            let el = document.getElementById(id);
+            let data = window.textDatabase[id];
+
+            if (el.classList.contains('expanded-blue') || el.classList.contains('expanded-green')) {
+                el.innerText = data.short;
+                el.className = data.type === 'blue' ? 'layer-blue' : 'layer-green';
+            } else {
+                el.innerText = data.full;
+                el.className = data.type === 'blue' ? 'expanded-blue' : 'expanded-green';
+            }
+        }
+
+        /* ТЕКСТОВОЕ ФОРМАТИРОВАНИЕ */
+        function toggleFormat(styleType) {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            const page = file.pages.find(p => p.id === activePageId);
+            if (!page) return;
+
+            if (styleType === 'bold') page.isBold = !page.isBold;
+            if (styleType === 'italic') page.isItalic = !page.isItalic;
+            if (styleType === 'underline') page.isUnderline = !page.isUnderline;
+
+            loadActivePageOrCanvas();
+            saveToCloud();
+        }
+
+        function applyStyle() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            const page = file.pages.find(p => p.id === activePageId);
+            if (!page) return;
+
+            page.font = document.getElementById('fontFamily').value;
+            page.size = document.getElementById('fontSize').value;
+
+            loadActivePageOrCanvas();
+            saveToCloud();
+        }
+
+        document.getElementById('textEditor').addEventListener('input', () => {
+            updateStats();
+            saveToCloud();
+        });
+
+        function updateStats() {
+            const val = document.getElementById('textEditor').value;
+            document.getElementById('charCount').innerText = val.length;
+            document.getElementById('wordCount').innerText = val.trim() ? val.trim().split(/\s+/).length : 0;
+        }
+
+        // ЭКСПОРТ И ИМПОРТ
+        function exportData() {
+            saveCurrentContent();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.treeData));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `studyhub_backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (Array.isArray(imported)) {
+                        window.treeData = imported;
+                        saveToCloud();
+                        renderTree();
+                        openFile(window.treeData[0]?.id || '1');
+                        alert("Данные успешно импортированы!");
+                    }
+                } catch (err) {
+                    alert("Ошибка импорта.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // РЕГИСТРАЦИЯ PWA SERVICE WORKER
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', e => self.skipWaiting());
+                self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+        }
+
+        window.onload = () => {
+            renderTree();
+            openFile(window.activeFileId);
+        };
+    </script>
+</body>
+</html>
