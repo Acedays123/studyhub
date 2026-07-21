@@ -782,14 +782,6 @@
             csharp: `using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello, World!");\n    }\n}`
         };
 
-        const PISTON_LANG_MAP = {
-            cpp: { language: 'c++', version: '10.2.0', file: 'main.cpp' },
-            python: { language: 'python', version: '3.10.0', file: 'main.py' },
-            java: { language: 'java', version: '15.0.2', file: 'Main.java' },
-            javascript: { language: 'javascript', version: '18.15.0', file: 'main.js' },
-            csharp: { language: 'csharp', version: '6.12.0', file: 'main.cs' }
-        };
-
         function updateCloudStatus(text) {
             const el = document.getElementById('syncStatus');
             if (el) el.innerText = text;
@@ -1111,7 +1103,13 @@
 
             if (canvasObj) {
                 const canvas = document.getElementById('paintCanvas');
-                canvasObj.draw = canvas.toDataURL();
+                const ctx = canvas.getContext('2d');
+                const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                const isCanvasBlank = !pixelData.some(channel => channel !== 0);
+
+                if (!isCanvasBlank || canvasObj.draw) {
+                    canvasObj.draw = canvas.toDataURL();
+                }
             }
 
             file.codeSnippet = document.getElementById('codeTextArea').value;
@@ -1176,38 +1174,69 @@
             const langKey = document.getElementById('codeLangSelect').value;
             const code = document.getElementById('codeTextArea').value;
             const output = document.getElementById('codeOutput');
-            const config = PISTON_LANG_MAP[langKey];
+
+            const JUDGE0_LANG_IDS = {
+                cpp: 54,        // C++ (GCC 9.2.0)
+                python: 71,     // Python (3.8.1)
+                java: 62,       // Java (OpenJDK 13.0.1)
+                javascript: 63, // JavaScript (Node.js 12.14.0)
+                csharp: 51      // C# (Mono 6.6.0.161)
+            };
 
             if (!code.trim()) {
                 output.innerText = "⚠️ Код пуст!";
                 return;
             }
 
-            output.innerText = "⏳ Отправка кода на сервер...";
+            output.innerText = "⏳ Отправка кода и компиляция...";
 
             try {
-                const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+                const response = await fetch('https://judge0-ce.p.rapidapi.com/submissions?wait=true', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+                    },
                     body: JSON.stringify({
-                        language: config.language,
-                        version: config.version,
-                        files: [{ name: config.file, content: code }]
+                        language_id: JUDGE0_LANG_IDS[langKey] || 54,
+                        source_code: code
                     })
                 });
 
-                const resData = await response.json();
-
-                if (resData.run) {
-                    let result = resData.run.output || "Код выполнен без вывода.";
-                    output.innerText = result;
-                } else if (resData.message) {
-                    output.innerText = "❌ Ошибка API: " + resData.message;
-                } else {
-                    output.innerText = "❌ Ошибка компиляции.";
+                if (!response.ok) {
+                    return runCodeGlotFallback(langKey, code, output);
                 }
+
+                const resData = await response.json();
+                let result = resData.stdout || resData.compile_output || resData.stderr || "Код выполнен без вывода.";
+                output.innerText = result;
+
             } catch (err) {
-                output.innerText = "❌ Ошибка сети: " + err.message;
+                runCodeGlotFallback(langKey, code, output);
+            }
+        }
+
+        async function runCodeGlotFallback(langKey, code, output) {
+            const GLOT_LANGS = {
+                cpp: 'cpp',
+                python: 'python',
+                java: 'java',
+                javascript: 'javascript',
+                csharp: 'csharp'
+            };
+
+            try {
+                const response = await fetch(`https://glot.io/api/run/${GLOT_LANGS[langKey]}?version=latest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        files: [{ name: `main.${langKey === 'cpp' ? 'cpp' : 'txt'}`, content: code }]
+                    })
+                });
+                const data = await response.json();
+                output.innerText = data.stdout || data.stderr || data.error || "Выполнено без вывода.";
+            } catch (e) {
+                output.innerText = "❌ Ошибка компиляции сервиса. Попробуйте позже.";
             }
         }
 
@@ -1310,6 +1339,14 @@
             if (painting) {
                 painting = false;
                 ctx.beginPath();
+
+                const file = findNode(window.treeData, window.activeFileId);
+                if (file) {
+                    let canvasObj = file.canvases?.find(c => c.id === activeCanvasId);
+                    if (canvasObj) {
+                        canvasObj.draw = canvas.toDataURL();
+                    }
+                }
                 saveToCloud();
             }
         });
@@ -1338,6 +1375,13 @@
         function clearCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.beginPath();
+            const file = findNode(window.treeData, window.activeFileId);
+            if (file) {
+                let canvasObj = file.canvases?.find(c => c.id === activeCanvasId);
+                if (canvasObj) {
+                    canvasObj.draw = '';
+                }
+            }
             saveToCloud();
         }
 
