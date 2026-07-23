@@ -569,6 +569,105 @@
             font-weight: bold;
         }
 
+        /* 🤖 СТИЛИ ДЛЯ AI CANVAS МОДУЛЯ */
+        .ai-canvas-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: #0f172a;
+            color: #f8fafc;
+            position: relative;
+        }
+
+        .ai-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 15px;
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            font-size: 13px;
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+
+        .ai-toolbar input, .ai-toolbar select, .ai-toolbar button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: #f8fafc;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .ai-toolbar button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .ai-toolbar button:hover { background: #1d4ed8; }
+
+        .ai-workspace {
+            flex-grow: 1;
+            position: relative;
+            overflow: auto;
+            background: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 20px 20px;
+            padding: 40px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-content: flex-start;
+        }
+
+        .ai-card {
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 10px;
+            width: 380px;
+            min-height: 200px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            cursor: move;
+            user-select: none;
+        }
+
+        .ai-card-header {
+            padding: 10px 14px;
+            background: #334155;
+            border-radius: 9px 9px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 13px;
+            color: #38bdf8;
+        }
+
+        .ai-card-body {
+            padding: 14px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e2e8f0;
+            overflow-y: auto;
+            max-height: 400px;
+            white-space: pre-wrap;
+            user-select: text;
+        }
+
+        .ai-card-close {
+            cursor: pointer;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .ai-card-close:hover { color: #f87171; }
+
         @media (max-width: 768px) {
             body { flex-direction: column; }
             sidebar { width: 100%; height: 220px; border-right: none; border-bottom: 2px solid var(--border); }
@@ -605,6 +704,7 @@
                 <button class="mode-btn" id="btn-compress" onclick="setMode('compress')">⚡ Сократитель</button>
                 <button class="mode-btn" id="btn-pptx" onclick="setMode('pptx')">📊 Презентация</button>
                 <button class="mode-btn" id="btn-code" onclick="setMode('code')">💻 Код</button>
+                <button class="mode-btn" id="btn-aicanvas" onclick="setMode('aicanvas')">✨ AI Canvas</button>
             </div>
         </header>
 
@@ -686,6 +786,24 @@
                     <div id="codeOutput">Нажмите «▶️ Запустить», чтобы выполнить код...</div>
                 </div>
             </div>
+
+            <!-- 🤖 ИНТЕЛЛЕКТУАЛЬНЫЙ МОДУЛЬ GEMINI AI CANVAS -->
+            <div id="aiCanvasEditor" class="ai-canvas-wrapper hidden">
+                <div class="ai-toolbar">
+                    <input type="password" id="geminiApiKey" placeholder="Введи Gemini API Key..." style="width: 180px;">
+                    <select id="aiPromptMode">
+                        <option value="examples">📚 Сгенерировать примеры по теме</option>
+                        <option value="solve">📐 Пошаговое решение задачи</option>
+                        <option value="summary">📝 Сделать краткий конспект</option>
+                        <option value="free">💬 Свободный запрос к ИИ</option>
+                    </select>
+                    <input type="text" id="aiPromptInput" placeholder="Введите тему или задачу..." style="flex-grow: 1;">
+                    <button onclick="generateAICard()">🚀 Сгенерировать</button>
+                </div>
+                <div class="ai-workspace" id="aiWorkspace">
+                    <!-- Сюда добавляются карточки Canvas AI -->
+                </div>
+            </div>
         </div>
 
         <div class="footer-bar">
@@ -722,7 +840,7 @@
 
     <script>
         const LOCAL_STORAGE_KEY = 'studyhub_chest_local_data';
-        const DELETE_PIN = '1234'; // 🔒 PIN-код для подтверждения удаления
+        const DELETE_PIN = '1234';
 
         const defaultTreeData = [
             {
@@ -737,7 +855,8 @@
                                         canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
                                         codeSnippet: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}',
                                         codeLang: 'cpp',
-                                        slides: []
+                                        slides: [],
+                                        aiCards: []
                                     }
                                 ]
                             }
@@ -958,7 +1077,8 @@
                 canvases: [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }],
                 codeSnippet: CODE_TEMPLATES.cpp,
                 codeLang: 'cpp',
-                slides: []
+                slides: [],
+                aiCards: []
             };
 
             if (!parentId) window.treeData.push(newNode);
@@ -976,13 +1096,12 @@
             saveToCloud();
         }
 
-        /* 🔒 БЕЗОПАСНОЕ УДАЛЕНИЕ С ПИН-КОДОМ */
         function deleteNode(id, e) {
             if (e) e.stopPropagation();
             
             const userPin = prompt(`⚠️ Для подтверждения удаления введите PIN-код (${DELETE_PIN}):`);
             
-            if (userPin === null) return; // Нажал отмену
+            if (userPin === null) return;
             
             if (userPin.trim() === DELETE_PIN) {
                 window.treeData = removeFromTree(window.treeData, id);
@@ -1024,6 +1143,7 @@
             renderSubTabs();
             loadActivePageOrCanvas();
             renderSlide();
+            renderAICards();
         }
         window.openFile = openFile;
 
@@ -1169,6 +1289,7 @@
             document.getElementById('compressEditor').classList.add('hidden');
             document.getElementById('pptxEditor').classList.add('hidden');
             document.getElementById('codeEditor').classList.add('hidden');
+            document.getElementById('aiCanvasEditor').classList.add('hidden');
 
             if (mode === 'text') {
                 document.getElementById('textEditor').classList.remove('hidden');
@@ -1183,6 +1304,10 @@
             } else if (mode === 'code') {
                 document.getElementById('codeEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.add('hidden');
+            } else if (mode === 'aicanvas') {
+                document.getElementById('aiCanvasEditor').classList.remove('hidden');
+                document.getElementById('formatToolbar').classList.add('hidden');
+                renderAICards();
             } else {
                 document.getElementById('formatToolbar').classList.add('hidden');
             }
@@ -1212,7 +1337,7 @@
             }
         }
 
-        /* 💻 НОВЫЙ ИСПРАВЛЕННЫЙ КОМПИЛЯТОР И ИСППОЛНИТЕЛЬ КОДА */
+        /* 💻 КОМПИЛЯТОР И ИСПОЛНИТЕЛЬ КОДА */
         async function runCode() {
             const langKey = document.getElementById('codeLangSelect').value;
             const code = document.getElementById('codeTextArea').value;
@@ -1226,7 +1351,6 @@
 
             output.innerText = "⏳ Выполнение кода...";
 
-            // 1. Исполнение JavaScript нативно в браузере (быстро и без сети)
             if (langKey === 'javascript') {
                 try {
                     let logs = [];
@@ -1246,7 +1370,6 @@
                 return;
             }
 
-            // 2. Исполнение C++, Python, Java, C# через Piston Engine v2 API
             const PISTON_LANG_MAP = {
                 cpp: { language: 'c++', version: '10.2.0' },
                 python: { language: 'python', version: '3.10.0' },
@@ -1281,7 +1404,6 @@
                 }
                 throw new Error("Piston API error");
             } catch (err) {
-                // Фолбэк на резервный сервер компиляции
                 runCodeGlotFallback(langKey, code, stdin, output);
             }
         }
@@ -1321,6 +1443,149 @@
             saveCodeContent();
             triggerCloudSync();
         });
+
+        /* 🤖 ЛОГИКА ИНТЕГРАЦИИ GEMINI AI CANVAS */
+        const geminiKeyInput = document.getElementById('geminiApiKey');
+        geminiKeyInput.value = localStorage.getItem('studyhub_gemini_key') || '';
+        geminiKeyInput.addEventListener('change', () => {
+            localStorage.setItem('studyhub_gemini_key', geminiKeyInput.value.trim());
+        });
+
+        async function generateAICard() {
+            const apiKey = geminiKeyInput.value.trim();
+            const mode = document.getElementById('aiPromptMode').value;
+            const promptText = document.getElementById('aiPromptInput').value.trim();
+
+            if (!apiKey) {
+                alert('Пожалуйста, введите ваш Gemini API Key!');
+                return;
+            }
+            if (!promptText) {
+                alert('Введите тему или условие задачи.');
+                return;
+            }
+
+            let systemInstruction = "";
+            if (mode === "examples") systemInstruction = "Составь 3 развернутых учебных примера по теме:";
+            if (mode === "solve") systemInstruction = "Реши следующую задачу подробно, по шагам с пояснениями:";
+            if (mode === "summary") systemInstruction = "Сделай структурированный краткий конспект темы:";
+            if (mode === "free") systemInstruction = "Ответь кратко и понятно на следующий учебный запрос:";
+
+            const fullPrompt = `${systemInstruction} ${promptText}`;
+
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            if (!file.aiCards) file.aiCards = [];
+
+            const tempId = 'card_' + Date.now();
+            const newCard = {
+                id: tempId,
+                title: `${mode.toUpperCase()}: ${promptText.substring(0, 20)}...`,
+                text: "⏳ ИИ генерирует ответ...",
+                x: 30 + (file.aiCards.length * 20),
+                y: 30 + (file.aiCards.length * 20)
+            };
+
+            file.aiCards.push(newCard);
+            renderAICards();
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: fullPrompt }] }]
+                    })
+                });
+
+                const data = await res.json();
+                const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "❌ Ошибка получения ответа от Gemini.";
+                
+                const cardRef = file.aiCards.find(c => c.id === tempId);
+                if (cardRef) {
+                    cardRef.text = aiResponse;
+                    renderAICards();
+                    saveToCloud();
+                }
+            } catch (err) {
+                const cardRef = file.aiCards.find(c => c.id === tempId);
+                if (cardRef) {
+                    cardRef.text = "❌ Ошибка запроса: " + err.toString();
+                    renderAICards();
+                }
+            }
+        }
+
+        function renderAICards() {
+            const workspace = document.getElementById('aiWorkspace');
+            workspace.innerHTML = '';
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file || !file.aiCards) return;
+
+            file.aiCards.forEach(card => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'ai-card';
+                cardDiv.style.left = `${card.x}px`;
+                cardDiv.style.top = `${card.y}px`;
+
+                cardDiv.innerHTML = `
+                    <div class="ai-card-header">
+                        <span>${card.title}</span>
+                        <span class="ai-card-close" onclick="removeAICard('${card.id}')">✕</span>
+                    </div>
+                    <div class="ai-card-body">${card.text}</div>
+                `;
+
+                makeDraggableCard(cardDiv, card);
+                workspace.appendChild(cardDiv);
+            });
+        }
+
+        function removeAICard(id) {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file || !file.aiCards) return;
+            file.aiCards = file.aiCards.filter(c => c.id !== id);
+            renderAICards();
+            saveToCloud();
+        }
+
+        function makeDraggableCard(element, cardObj) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            const header = element.querySelector('.ai-card-header');
+
+            header.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+
+                const newY = element.offsetTop - pos2;
+                const newX = element.offsetLeft - pos1;
+
+                element.style.top = newY + "px";
+                element.style.left = newX + "px";
+
+                cardObj.x = newX;
+                cardObj.y = newY;
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                saveToCloud();
+            }
+        }
 
         function openModal(nodeId, e) {
             e.stopPropagation();
