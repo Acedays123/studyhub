@@ -1479,7 +1479,8 @@
             file.aiCards.push(newCard);
             renderAICards();
 
-            const modelName = "gemini-2.5-flash"; 
+            // ОБНОВЛЕНО: Используем актуальную модель gemini-1.5-flash
+            const modelName = "gemini-1.5-flash"; 
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
             try {
@@ -1497,7 +1498,7 @@
                     throw new Error(data.error.message || JSON.stringify(data.error));
                 }
 
-                const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "❌ Ошибка получения ответа от Gemini.";
+                const aiResponse = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || "❌ Ошибка получения ответа от Gemini.";
                 
                 const cardRef = file.aiCards.find(c => c.id === tempId);
                 if (cardRef) {
