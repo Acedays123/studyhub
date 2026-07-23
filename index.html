@@ -569,7 +569,7 @@
             font-weight: bold;
         }
 
-        /* 🤖 СТИЛИ ДЛЯ AI CANVAS МОДУЛЯ */
+        /* AI CANVAS MODULE */
         .ai-canvas-wrapper {
             display: flex;
             flex-direction: column;
@@ -787,7 +787,7 @@
                 </div>
             </div>
 
-            <!-- 🤖 ИНТЕЛЛЕКТУАЛЬНЫЙ МОДУЛЬ GEMINI AI CANVAS -->
+            <!-- GEMINI AI CANVAS -->
             <div id="aiCanvasEditor" class="ai-canvas-wrapper hidden">
                 <div class="ai-toolbar">
                     <input type="password" id="geminiApiKey" placeholder="Введи Gemini API Key..." style="width: 180px;">
@@ -800,9 +800,7 @@
                     <input type="text" id="aiPromptInput" placeholder="Введите тему или задачу..." style="flex-grow: 1;">
                     <button onclick="generateAICard()">🚀 Сгенерировать</button>
                 </div>
-                <div class="ai-workspace" id="aiWorkspace">
-                    <!-- Сюда добавляются карточки Canvas AI -->
-                </div>
+                <div class="ai-workspace" id="aiWorkspace"></div>
             </div>
         </div>
 
@@ -842,6 +840,14 @@
         const LOCAL_STORAGE_KEY = 'studyhub_chest_local_data';
         const DELETE_PIN = '1234';
 
+        const CODE_TEMPLATES = {
+            cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}`,
+            python: `print("Hello, World!")`,
+            java: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}`,
+            javascript: `console.log("Hello, World!");`,
+            csharp: `using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello, World!");\n    }\n}`
+        };
+
         const defaultTreeData = [
             {
                 id: '1', name: 'Учеба', type: 'chest', icon: '🧰', collapsed: false, children: [
@@ -853,7 +859,7 @@
                                         id: '1-1-1-1', name: 'Заметки', type: 'scroll', icon: '📜',
                                         pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
                                         canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
-                                        codeSnippet: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}',
+                                        codeSnippet: CODE_TEMPLATES.cpp,
                                         codeLang: 'cpp',
                                         slides: [],
                                         aiCards: []
@@ -895,23 +901,11 @@
         let isPanning = false, startX, startY;
         let currentSlides = [], currentSlideIdx = 0;
 
-        const CODE_TEMPLATES = {
-            cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}`,
-            python: `print("Hello, World!")`,
-            java: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}`,
-            javascript: `console.log("Hello, World!");`,
-            csharp: `using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello, World!");\n    }\n}`
-        };
-
         function updateCloudStatus(text) {
             const el = document.getElementById('syncStatus');
             if (el) el.innerText = text;
         }
         window.updateCloudStatus = updateCloudStatus;
-
-        /* ==========================================================================
-           МОДУЛЬНАЯ СИСТЕМА СОХРАНЕНИЯ
-           ========================================================================== */
 
         function saveTextContent() {
             const file = findNode(window.treeData, window.activeFileId);
@@ -984,8 +978,6 @@
             triggerCloudSync();
         }
         window.saveToCloud = saveToCloud;
-
-        /* ========================================================================== */
 
         function findNode(nodes, id) {
             for (let n of nodes) {
@@ -1337,7 +1329,6 @@
             }
         }
 
-        /* 💻 КОМПИЛЯТОР И ИСПОЛНИТЕЛЬ КОДА */
         async function runCode() {
             const langKey = document.getElementById('codeLangSelect').value;
             const code = document.getElementById('codeTextArea').value;
@@ -1444,7 +1435,6 @@
             triggerCloudSync();
         });
 
-        /* 🤖 ЛОГИКА ИНТЕГРАЦИИ GEMINI AI CANVAS */
         const geminiKeyInput = document.getElementById('geminiApiKey');
         geminiKeyInput.value = localStorage.getItem('studyhub_gemini_key') || '';
         geminiKeyInput.addEventListener('change', () => {
@@ -1620,7 +1610,6 @@
             saveToCloud();
         }
 
-        /* 🎨 CANVAS */
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d');
         const canvasContainer = document.getElementById('canvasContainer');
@@ -1709,7 +1698,6 @@
             triggerCloudSync();
         }
 
-        /* 📊 PPTX */
         async function handlePptxUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -1789,7 +1777,6 @@
             }
         }
 
-        /* ⚡ СОКРАТИШЕЛЬ */
         function generateBook() {
             const file = findNode(window.treeData, window.activeFileId);
             if (!file) return;
