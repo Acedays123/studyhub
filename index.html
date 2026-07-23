@@ -1479,7 +1479,6 @@
             file.aiCards.push(newCard);
             renderAICards();
 
-            // Список алиасов моделей на случай ограничений API аккаунта
             const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
             let success = false;
             let lastErrorMsg = "";
@@ -1500,7 +1499,7 @@
 
                     if (data.error) {
                         lastErrorMsg = data.error.message || JSON.stringify(data.error);
-                        continue; // Если ошибка с данной моделью, пробуем следующую
+                        continue;
                     }
 
                     const aiResponse = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || "❌ Ошибка получения ответа от Gemini.";
