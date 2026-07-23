@@ -1479,37 +1479,49 @@
             file.aiCards.push(newCard);
             renderAICards();
 
-            // ОБНОВЛЕНО: Используем актуальную модель gemini-1.5-flash
-            const modelName = "gemini-1.5-flash"; 
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            // Список алиасов моделей на случай ограничений API аккаунта
+            const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+            let success = false;
+            let lastErrorMsg = "";
 
-            try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: fullPrompt }] }]
-                    })
-                });
+            for (let model of candidateModels) {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-                const data = await res.json();
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: fullPrompt }] }]
+                        })
+                    });
 
-                if (data.error) {
-                    throw new Error(data.error.message || JSON.stringify(data.error));
+                    const data = await res.json();
+
+                    if (data.error) {
+                        lastErrorMsg = data.error.message || JSON.stringify(data.error);
+                        continue; // Если ошибка с данной моделью, пробуем следующую
+                    }
+
+                    const aiResponse = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || "❌ Ошибка получения ответа от Gemini.";
+                    
+                    const cardRef = file.aiCards.find(c => c.id === tempId);
+                    if (cardRef) {
+                        cardRef.text = aiResponse;
+                        renderAICards();
+                        saveToCloud();
+                    }
+                    success = true;
+                    break;
+                } catch (err) {
+                    lastErrorMsg = err.message;
                 }
+            }
 
-                const aiResponse = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || "❌ Ошибка получения ответа от Gemini.";
-                
+            if (!success) {
                 const cardRef = file.aiCards.find(c => c.id === tempId);
                 if (cardRef) {
-                    cardRef.text = aiResponse;
-                    renderAICards();
-                    saveToCloud();
-                }
-            } catch (err) {
-                const cardRef = file.aiCards.find(c => c.id === tempId);
-                if (cardRef) {
-                    cardRef.text = "❌ Ошибка запроса: " + err.message;
+                    cardRef.text = "❌ Ошибка запроса: " + lastErrorMsg;
                     renderAICards();
                 }
             }
