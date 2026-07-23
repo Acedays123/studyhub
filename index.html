@@ -788,29 +788,87 @@
         }
         window.updateCloudStatus = updateCloudStatus;
 
-        function saveToCloud() {
-            saveCurrentContent();
+        /* ==========================================================================
+           МОДУЛЬНАЯ СИСТЕМА СОХРАНЕНИЯ (РАЗДЕЛЬНАЯ ЛОГИКА)
+           ========================================================================== */
+
+        // 1. Сохранение ТОЛЬКО текстовой страницы
+        function saveTextContent() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            if (!file.pages) file.pages = [];
+
+            let page = file.pages.find(p => p.id === activePageId);
+            if (!page && file.pages.length > 0) page = file.pages[0];
+
+            if (page) {
+                page.text = document.getElementById('textEditor').value;
+            }
+        }
+
+        // 2. Сохранение ТОЛЬКО Canvas
+        function saveCanvasContent() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            if (!file.canvases) file.canvases = [];
+
+            let canvasObj = file.canvases.find(c => c.id === activeCanvasId);
+            if (!canvasObj && file.canvases.length > 0) canvasObj = file.canvases[0];
+
+            if (canvasObj) {
+                const canvas = document.getElementById('paintCanvas');
+                const ctx = canvas.getContext('2d');
+                const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                const isCanvasBlank = !pixelData.some(channel => channel !== 0);
+
+                if (!isCanvasBlank || canvasObj.draw) {
+                    canvasObj.draw = canvas.toDataURL();
+                }
+            }
+        }
+
+        // 3. Сохранение ТОЛЬКО кода
+        function saveCodeContent() {
+            const file = findNode(window.treeData, window.activeFileId);
+            if (!file) return;
+            file.codeSnippet = document.getElementById('codeTextArea').value;
+            file.codeLang = document.getElementById('codeLangSelect').value;
+        }
+
+        // Общий синхронизатор с облаком
+        function triggerCloudSync() {
             saveToLocalStorage();
 
             if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-
             updateCloudStatus('🟡 Сохранение...');
 
             saveDebounceTimer = setTimeout(() => {
                 if (window.docRef && window.setDoc) {
                     window.setDoc(window.docRef, { treeData: window.treeData }, { merge: true })
-                        .then(() => {
-                            updateCloudStatus('🟢 Сохранено в облаке');
-                        })
-                        .catch(() => {
-                            updateCloudStatus('🟢 Сохранено локально');
-                        });
+                        .then(() => updateCloudStatus('🟢 Сохранено в облаке'))
+                        .catch(() => updateCloudStatus('🟢 Сохранено локально'));
                 } else {
                     updateCloudStatus('🟢 Сохранено локально');
                 }
             }, 500);
         }
+
+        function saveCurrentContent() {
+            if (currentMode === 'text' || currentMode === 'compress') saveTextContent();
+            if (currentMode === 'draw') saveCanvasContent();
+            if (currentMode === 'code') saveCodeContent();
+            
+            const file = findNode(window.treeData, window.activeFileId);
+            if (file) file.slides = currentSlides;
+        }
+
+        function saveToCloud() {
+            saveCurrentContent();
+            triggerCloudSync();
+        }
         window.saveToCloud = saveToCloud;
+
+        /* ========================================================================== */
 
         function findNode(nodes, id) {
             for (let n of nodes) {
@@ -975,7 +1033,7 @@
                     const tab = document.createElement('div');
                     tab.className = `tab-item ${p.id === activePageId ? 'active' : ''}`;
                     tab.innerHTML = `📜 ${p.name} <span onclick="deleteSubTab('page', '${p.id}', event)">✕</span>`;
-                    tab.onclick = () => { saveToCloud(); activePageId = p.id; renderSubTabs(); loadActivePageOrCanvas(); };
+                    tab.onclick = () => { saveCurrentContent(); activePageId = p.id; renderSubTabs(); loadActivePageOrCanvas(); };
                     container.appendChild(tab);
                 });
                 const addBtn = document.createElement('button');
@@ -988,7 +1046,7 @@
                     const tab = document.createElement('div');
                     tab.className = `tab-item ${c.id === activeCanvasId ? 'active' : ''}`;
                     tab.innerHTML = `🎨 ${c.name} <span onclick="deleteSubTab('canvas', '${c.id}', event)">✕</span>`;
-                    tab.onclick = () => { saveToCloud(); activeCanvasId = c.id; renderSubTabs(); loadActivePageOrCanvas(); };
+                    tab.onclick = () => { saveCurrentContent(); activeCanvasId = c.id; renderSubTabs(); loadActivePageOrCanvas(); };
                     container.appendChild(tab);
                 });
                 const addBtn = document.createElement('button');
@@ -1085,40 +1143,10 @@
             if (currentMode === 'compress') generateBook();
         }
 
-        function saveCurrentContent() {
-            const file = findNode(window.treeData, window.activeFileId);
-            if (!file) return;
-
-            if (!file.pages) file.pages = [];
-            let page = file.pages.find(p => p.id === activePageId);
-            if (!page && file.pages.length > 0) page = file.pages[0];
-            
-            if (page) {
-                page.text = document.getElementById('textEditor').value;
-            }
-
-            if (!file.canvases) file.canvases = [];
-            let canvasObj = file.canvases.find(c => c.id === activeCanvasId);
-            if (!canvasObj && file.canvases.length > 0) canvasObj = file.canvases[0];
-
-            if (canvasObj) {
-                const canvas = document.getElementById('paintCanvas');
-                const ctx = canvas.getContext('2d');
-                const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-                const isCanvasBlank = !pixelData.some(channel => channel !== 0);
-
-                if (!isCanvasBlank || canvasObj.draw) {
-                    canvasObj.draw = canvas.toDataURL();
-                }
-            }
-
-            file.codeSnippet = document.getElementById('codeTextArea').value;
-            file.codeLang = document.getElementById('codeLangSelect').value;
-            file.slides = currentSlides;
-        }
-
         function setMode(mode) {
-            saveToCloud();
+            saveCurrentContent();
+            triggerCloudSync();
+
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
@@ -1164,7 +1192,8 @@
             if (!area.value.trim() || confirm("Заменить код шаблоном для " + newLang.toUpperCase() + "?")) {
                 area.value = CODE_TEMPLATES[newLang] || '';
                 if (file) file.codeLang = newLang;
-                saveToCloud();
+                saveCodeContent();
+                triggerCloudSync();
             } else {
                 selectEl.value = currentLang;
             }
@@ -1253,7 +1282,8 @@
         }
 
         document.getElementById('codeTextArea').addEventListener('input', () => {
-            saveToCloud();
+            saveCodeContent();
+            triggerCloudSync();
         });
 
         function openModal(nodeId, e) {
@@ -1339,15 +1369,8 @@
             if (painting) {
                 painting = false;
                 ctx.beginPath();
-
-                const file = findNode(window.treeData, window.activeFileId);
-                if (file) {
-                    let canvasObj = file.canvases?.find(c => c.id === activeCanvasId);
-                    if (canvasObj) {
-                        canvasObj.draw = canvas.toDataURL();
-                    }
-                }
-                saveToCloud();
+                saveCanvasContent();
+                triggerCloudSync();
             }
         });
 
@@ -1382,7 +1405,7 @@
                     canvasObj.draw = '';
                 }
             }
-            saveToCloud();
+            triggerCloudSync();
         }
 
         /* 📊 PPTX */
@@ -1550,7 +1573,8 @@
 
         document.getElementById('textEditor').addEventListener('input', () => {
             updateStats();
-            saveToCloud();
+            saveTextContent();
+            triggerCloudSync();
         });
 
         function updateStats() {
