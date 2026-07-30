@@ -329,6 +329,12 @@
             color: var(--primary);
         }
 
+        .btn-quick-eye {
+            background: var(--primary-light) !important;
+            color: var(--primary) !important;
+            border: 1px solid var(--primary) !important;
+        }
+
         .work-area {
             flex-grow: 1;
             position: relative;
@@ -409,7 +415,7 @@
             font-weight: 900;
             color: #ffffff;
             user-select: none;
-            transition: transform 0.1s linear, background 0.5s ease;
+            transition: transform 0.05s linear, background 0.4s ease;
             transform: translate(-50%, -50%);
         }
 
@@ -417,7 +423,7 @@
             position: absolute;
             bottom: 15px;
             left: 15px;
-            background: rgba(17, 24, 39, 0.8);
+            background: rgba(17, 24, 39, 0.85);
             padding: 8px 15px;
             border-radius: 8px;
             border: 1px solid #374151;
@@ -748,6 +754,7 @@
             <button id="btnBold" onclick="toggleFormat('bold')"><b>B</b></button>
             <button id="btnItalic" onclick="toggleFormat('italic')"><i>I</i></button>
             <button id="btnUnderline" onclick="toggleFormat('underline')"><u>U</u></button>
+            <button class="btn-quick-eye" onclick="setMode('eyetrainer'); startEyeSession();">👁️ Быстрая разминка</button>
         </div>
 
         <div class="work-area">
@@ -756,7 +763,7 @@
             <div id="eyeTrainerEditor" class="eye-wrapper hidden">
                 <div class="eye-controls">
                     <label>Траектория: 
-                        <select id="eyePattern">
+                        <select id="eyePattern" onchange="resetChaosState()">
                             <option value="figure8">Восьмёрка (∞)</option>
                             <option value="spiral">Спираль</option>
                             <option value="chaos">Хаос (Перескоки)</option>
@@ -961,7 +968,7 @@
         let isPanning = false, startX, startY;
         let currentSlides = [], currentSlideIdx = 0;
 
-        // EYE TRAINER ENGINE
+        // FIXED EYE TRAINER ENGINE
         let eyeAnimId = null;
         let eyeTimerInterval = null;
         let eyeTimeLeft = 60;
@@ -969,6 +976,7 @@
         let eyeAngle = 0;
         let eyeCurrentChar = 'А';
         let isEyeActive = false;
+        let targetChaosX = 0, targetChaosY = 0, currentChaosX = 0, currentChaosY = 0;
 
         const EYE_COLORS = ['radial-gradient(circle at 30% 30%, #38bdf8, #1d4ed8)', 
                             'radial-gradient(circle at 30% 30%, #4ade80, #15803d)', 
@@ -1356,7 +1364,7 @@
                 document.getElementById('formatToolbar').classList.remove('hidden');
             } else if (mode === 'eyetrainer') {
                 document.getElementById('eyeTrainerEditor').classList.remove('hidden');
-                document.getElementById('formatToolbar').classList.add('hidden');
+                document.getElementById('formatToolbar').classList.remove('hidden');
             } else if (mode === 'compress') {
                 document.getElementById('compressEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.remove('hidden');
@@ -1384,14 +1392,19 @@
             loadActivePageOrCanvas();
         }
 
-        // EYE TRAINER COMPLETE ENGINE
+        // EYE TRAINER CLEAN ENGINE & FIX FOR CHAOS
+        function resetChaosState() {
+            targetChaosX = 0; targetChaosY = 0; currentChaosX = 0; currentChaosY = 0;
+        }
+
         function startEyeSession() {
-            if (isEyeActive) stopEyeSession();
+            stopEyeSession(); // Always purge old timers before starting
 
             isEyeActive = true;
             eyeTimeLeft = parseInt(document.getElementById('eyeTimerVal').value) || 60;
             eyeScore = 0;
             eyeAngle = 0;
+            resetChaosState();
 
             document.getElementById('btnStartEye').innerText = '🔄 Перезапустить';
             updateEyeStatsUI();
@@ -1433,13 +1446,16 @@
                     x = cx + Math.cos(eyeAngle) * r;
                     y = cy + Math.sin(eyeAngle) * r;
                 } else if (pattern === 'chaos') {
-                    if (Math.floor(eyeAngle * 10) % 30 === 0) {
-                        x = 50 + Math.random() * w;
-                        y = 50 + Math.random() * h;
+                    if (Math.abs(targetChaosX - currentChaosX) < 5 && Math.abs(targetChaosY - currentChaosY) < 5) {
+                        targetChaosX = 50 + Math.random() * w;
+                        targetChaosY = 50 + Math.random() * h;
                     }
+                    currentChaosX += (targetChaosX - currentChaosX) * (0.05 * speedMultiplier);
+                    currentChaosY += (targetChaosY - currentChaosY) * (0.05 * speedMultiplier);
+                    x = currentChaosX;
+                    y = currentChaosY;
                 }
 
-                // Smooth scaling for focus exercise (accommodation)
                 let scale = 0.6 + Math.sin(eyeAngle * 1.5) * 0.4;
                 ball.style.left = `${x}px`;
                 ball.style.top = `${y}px`;
@@ -1460,8 +1476,8 @@
 
         function stopEyeSession() {
             isEyeActive = false;
-            if (eyeAnimId) cancelAnimationFrame(eyeAnimId);
-            if (eyeTimerInterval) clearInterval(eyeTimerInterval);
+            if (eyeAnimId) { cancelAnimationFrame(eyeAnimId); eyeAnimId = null; }
+            if (eyeTimerInterval) { clearInterval(eyeTimerInterval); eyeTimerInterval = null; }
             document.getElementById('btnStartEye').innerText = '▶️ Начать тренировку';
         }
 
