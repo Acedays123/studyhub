@@ -329,27 +329,6 @@
             color: var(--primary);
         }
 
-        .eye-trainer-btn {
-            background: #3b82f6 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 4px;
-            margin-left: auto;
-        }
-
-        .eye-trainer-bar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: #eff6ff;
-            border: 2px solid #bfdbfe;
-            padding: 6px 12px;
-            border-bottom: none;
-            font-size: 12px;
-            font-weight: 600;
-            color: #1e40af;
-        }
-
         .work-area {
             flex-grow: 1;
             position: relative;
@@ -371,8 +350,81 @@
             outline: none;
             resize: none;
             font-family: inherit;
-            transition: transform 0.1s linear;
-            transform-origin: center center;
+        }
+
+        /* EYE TRAINER STYLING */
+        .eye-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: #090d16;
+            color: #f8fafc;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .eye-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 15px;
+            background: #111827;
+            border-bottom: 1px solid #1f2937;
+            font-size: 13px;
+            z-index: 10;
+            overflow-x: auto;
+        }
+
+        .eye-controls select, .eye-controls button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            background: #1f2937;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .eye-controls button.btn-start { background: #16a34a; border: none; }
+        .eye-controls button.btn-stop { background: #dc2626; border: none; }
+
+        .eye-arena {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        .eye-ball {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #38bdf8, #1d4ed8);
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 900;
+            color: #ffffff;
+            user-select: none;
+            transition: transform 0.1s linear, background 0.5s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .eye-stats {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(17, 24, 39, 0.8);
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+            font-size: 13px;
+            font-weight: 600;
+            color: #38bdf8;
+            pointer-events: none;
         }
 
         .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; }
@@ -668,6 +720,7 @@
 
             <div class="mode-tabs">
                 <button class="mode-btn active" id="btn-text" onclick="setMode('text')">📜 Заметки</button>
+                <button class="mode-btn" id="btn-eyetrainer" onclick="setMode('eyetrainer')">👁️ Тренажёр зрения</button>
                 <button class="mode-btn" id="btn-draw" onclick="setMode('draw')">🎨 Рисование</button>
                 <button class="mode-btn" id="btn-compress" onclick="setMode('compress')">⚡ Сократитель</button>
                 <button class="mode-btn" id="btn-pptx" onclick="setMode('pptx')">📊 Презентация</button>
@@ -695,31 +748,43 @@
             <button id="btnBold" onclick="toggleFormat('bold')"><b>B</b></button>
             <button id="btnItalic" onclick="toggleFormat('italic')"><i>I</i></button>
             <button id="btnUnderline" onclick="toggleFormat('underline')"><u>U</u></button>
-
-            <button class="eye-trainer-btn" id="btnEyeTrainer" onclick="toggleEyeTrainer()">👁️ Фокусировка (Зрение)</button>
-        </div>
-
-        <div class="eye-trainer-bar hidden" id="eyeTrainerBar">
-            <span>👁️ ТРЕНИРОВКА ЗРЕНИЯ:</span>
-            <label>Скорость: 
-                <select id="eyeSpeed" onchange="updateEyeSettings()">
-                    <option value="0.5">Медленно</option>
-                    <option value="1" selected>Нормально</option>
-                    <option value="2">Быстро</option>
-                </select>
-            </label>
-            <label>Амплитуда: 
-                <select id="eyeMinScale" onchange="updateEyeSettings()">
-                    <option value="0.7">Слабая (0.7x)</option>
-                    <option value="0.4" selected>Средняя (0.4x)</option>
-                    <option value="0.2">Сильная (0.2x)</option>
-                </select>
-            </label>
-            <button class="action-btn" onclick="toggleEyePause()" id="btnEyePause">⏸️ Пауза</button>
         </div>
 
         <div class="work-area">
             <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Ссылки на YouTube добавятся в вкладку 'Все видео' автоматически!"></textarea>
+
+            <div id="eyeTrainerEditor" class="eye-wrapper hidden">
+                <div class="eye-controls">
+                    <label>Траектория: 
+                        <select id="eyePattern">
+                            <option value="figure8">Восьмёрка (∞)</option>
+                            <option value="spiral">Спираль</option>
+                            <option value="chaos">Хаос (Перескоки)</option>
+                        </select>
+                    </label>
+                    <label>Скорость: 
+                        <select id="eyeSpeed">
+                            <option value="1">Медленно</option>
+                            <option value="2" selected>Нормально</option>
+                            <option value="3.5">Быстро</option>
+                        </select>
+                    </label>
+                    <label>Время: 
+                        <select id="eyeTimerVal">
+                            <option value="60">1 минута</option>
+                            <option value="120">2 минуты</option>
+                            <option value="180">3 минуты</option>
+                        </select>
+                    </label>
+                    <label><input type="checkbox" id="eyeGameMode"> Режим игры (Жми Пробел на "А")</label>
+                    <button class="btn-start" id="btnStartEye" onclick="startEyeSession()">▶️ Начать тренировку</button>
+                    <button class="btn-stop" onclick="stopEyeSession()">🛑 Стоп</button>
+                </div>
+                <div class="eye-arena" id="eyeArena" onclick="handleEyeArenaClick()">
+                    <div class="eye-ball" id="eyeBall">А</div>
+                    <div class="eye-stats" id="eyeStats">⏱️ Осталось: 00:00 | 🎯 Очки: 0</div>
+                </div>
+            </div>
 
             <div id="drawEditor" class="canvas-wrapper hidden">
                 <div class="canvas-tools">
@@ -896,12 +961,19 @@
         let isPanning = false, startX, startY;
         let currentSlides = [], currentSlideIdx = 0;
 
-        // EYE TRAINER VARIABLES
-        let isEyeTrainerActive = false;
-        let isEyePaused = false;
-        let eyeAnimFrame = null;
-        let eyeScale = 1;
-        let eyeDirection = -1;
+        // EYE TRAINER ENGINE
+        let eyeAnimId = null;
+        let eyeTimerInterval = null;
+        let eyeTimeLeft = 60;
+        let eyeScore = 0;
+        let eyeAngle = 0;
+        let eyeCurrentChar = 'А';
+        let isEyeActive = false;
+
+        const EYE_COLORS = ['radial-gradient(circle at 30% 30%, #38bdf8, #1d4ed8)', 
+                            'radial-gradient(circle at 30% 30%, #4ade80, #15803d)', 
+                            'radial-gradient(circle at 30% 30%, #c084fc, #6b21a8)', 
+                            'radial-gradient(circle at 30% 30%, #fbbf24, #b45309)'];
 
         function updateCloudStatus(text) {
             const el = document.getElementById('syncStatus');
@@ -1264,13 +1336,14 @@
             saveCurrentContent();
             triggerCloudSync();
 
-            if (isEyeTrainerActive) stopEyeTrainer();
+            if (isEyeActive && mode !== 'eyetrainer') stopEyeSession();
 
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
 
             document.getElementById('textEditor').classList.add('hidden');
+            document.getElementById('eyeTrainerEditor').classList.add('hidden');
             document.getElementById('drawEditor').classList.add('hidden');
             document.getElementById('compressEditor').classList.add('hidden');
             document.getElementById('pptxEditor').classList.add('hidden');
@@ -1281,6 +1354,9 @@
             if (mode === 'text') {
                 document.getElementById('textEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.remove('hidden');
+            } else if (mode === 'eyetrainer') {
+                document.getElementById('eyeTrainerEditor').classList.remove('hidden');
+                document.getElementById('formatToolbar').classList.add('hidden');
             } else if (mode === 'compress') {
                 document.getElementById('compressEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.remove('hidden');
@@ -1308,62 +1384,113 @@
             loadActivePageOrCanvas();
         }
 
-        // EYE TRAINER LOGIC
-        function toggleEyeTrainer() {
-            if (isEyeTrainerActive) stopEyeTrainer();
-            else startEyeTrainer();
-        }
+        // EYE TRAINER COMPLETE ENGINE
+        function startEyeSession() {
+            if (isEyeActive) stopEyeSession();
 
-        function startEyeTrainer() {
-            isEyeTrainerActive = true;
-            isEyePaused = false;
-            document.getElementById('btnEyeTrainer').innerText = '🛑 Стоп Тренажёр';
-            document.getElementById('eyeTrainerBar').classList.remove('hidden');
-            eyeScale = 1;
-            eyeDirection = -1;
-            animateEyeTrainer();
-        }
+            isEyeActive = true;
+            eyeTimeLeft = parseInt(document.getElementById('eyeTimerVal').value) || 60;
+            eyeScore = 0;
+            eyeAngle = 0;
 
-        function stopEyeTrainer() {
-            isEyeTrainerActive = false;
-            if (eyeAnimFrame) cancelAnimationFrame(eyeAnimFrame);
-            document.getElementById('btnEyeTrainer').innerText = '👁️ Фокусировка (Зрение)';
-            document.getElementById('eyeTrainerBar').classList.add('hidden');
-            const editor = document.getElementById('textEditor');
-            editor.style.transform = 'scale(1)';
-            editor.style.opacity = '1';
-        }
+            document.getElementById('btnStartEye').innerText = '🔄 Перезапустить';
+            updateEyeStatsUI();
 
-        function toggleEyePause() {
-            isEyePaused = !isEyePaused;
-            document.getElementById('btnEyePause').innerText = isEyePaused ? '▶️ Продолжить' : '⏸️ Пауза';
-            if (!isEyePaused) animateEyeTrainer();
-        }
+            const arena = document.getElementById('eyeArena');
+            const ball = document.getElementById('eyeBall');
 
-        function animateEyeTrainer() {
-            if (!isEyeTrainerActive || isEyePaused) return;
+            let charChangeCounter = 0;
+            const alphabet = 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ';
 
-            const speed = parseFloat(document.getElementById('eyeSpeed').value) * 0.003;
-            const minScale = parseFloat(document.getElementById('eyeMinScale').value);
+            eyeTimerInterval = setInterval(() => {
+                eyeTimeLeft--;
+                updateEyeStatsUI();
+                if (eyeTimeLeft <= 0) {
+                    stopEyeSession();
+                    alert(`🎉 Тренировка окончена! Вы набрали очков: ${eyeScore}`);
+                }
+            }, 1000);
 
-            eyeScale += speed * eyeDirection;
+            function eyeLoop() {
+                if (!isEyeActive) return;
 
-            if (eyeScale <= minScale) {
-                eyeScale = minScale;
-                eyeDirection = 1;
-            } else if (eyeScale >= 1) {
-                eyeScale = 1;
-                eyeDirection = -1;
+                const speedMultiplier = parseFloat(document.getElementById('eyeSpeed').value) || 2;
+                eyeAngle += 0.02 * speedMultiplier;
+
+                const pattern = document.getElementById('eyePattern').value;
+                const w = arena.clientWidth - 100;
+                const h = arena.clientHeight - 100;
+                const cx = arena.clientWidth / 2;
+                const cy = arena.clientHeight / 2;
+
+                let x = cx, y = cy;
+
+                if (pattern === 'figure8') {
+                    x = cx + (Math.sin(eyeAngle) * w / 2.3);
+                    y = cy + (Math.sin(eyeAngle * 2) * h / 2.5);
+                } else if (pattern === 'spiral') {
+                    let r = (Math.sin(eyeAngle * 0.3) + 1.2) * (Math.min(w, h) / 3);
+                    x = cx + Math.cos(eyeAngle) * r;
+                    y = cy + Math.sin(eyeAngle) * r;
+                } else if (pattern === 'chaos') {
+                    if (Math.floor(eyeAngle * 10) % 30 === 0) {
+                        x = 50 + Math.random() * w;
+                        y = 50 + Math.random() * h;
+                    }
+                }
+
+                // Smooth scaling for focus exercise (accommodation)
+                let scale = 0.6 + Math.sin(eyeAngle * 1.5) * 0.4;
+                ball.style.left = `${x}px`;
+                ball.style.top = `${y}px`;
+                ball.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+                charChangeCounter++;
+                if (charChangeCounter % Math.floor(60 / speedMultiplier) === 0) {
+                    eyeCurrentChar = alphabet[Math.floor(Math.random() * alphabet.length)];
+                    ball.innerText = eyeCurrentChar;
+                    ball.style.background = EYE_COLORS[Math.floor(Math.random() * EYE_COLORS.length)];
+                }
+
+                eyeAnimId = requestAnimationFrame(eyeLoop);
             }
 
-            const editor = document.getElementById('textEditor');
-            editor.style.transform = `scale(${eyeScale})`;
-            editor.style.opacity = Math.max(0.4, eyeScale);
-
-            eyeAnimFrame = requestAnimationFrame(animateEyeTrainer);
+            eyeLoop();
         }
 
-        // VIDEO HUB AUTO SCANNER
+        function stopEyeSession() {
+            isEyeActive = false;
+            if (eyeAnimId) cancelAnimationFrame(eyeAnimId);
+            if (eyeTimerInterval) clearInterval(eyeTimerInterval);
+            document.getElementById('btnStartEye').innerText = '▶️ Начать тренировку';
+        }
+
+        function updateEyeStatsUI() {
+            const mins = Math.floor(eyeTimeLeft / 60);
+            const secs = eyeTimeLeft % 60;
+            const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            document.getElementById('eyeStats').innerText = `⏱️ Осталось: ${formattedTime} | 🎯 Очки: ${eyeScore}`;
+        }
+
+        function handleEyeArenaClick() {
+            if (!isEyeActive) return;
+            const isGameMode = document.getElementById('eyeGameMode').checked;
+            if (isGameMode && eyeCurrentChar === 'А') {
+                eyeScore += 10;
+                updateEyeStatsUI();
+                eyeCurrentChar = '✓';
+                document.getElementById('eyeBall').innerText = '✓';
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (currentMode === 'eyetrainer' && e.code === 'Space') {
+                e.preventDefault();
+                handleEyeArenaClick();
+            }
+        });
+
+        // VIDEO HUB SCANNER
         function renderVideoHub() {
             const container = document.getElementById('videoGridContainer');
             container.innerHTML = '';
