@@ -329,10 +329,15 @@
             color: var(--primary);
         }
 
-        .btn-quick-eye {
-            background: var(--primary-light) !important;
-            color: var(--primary) !important;
-            border: 1px solid var(--primary) !important;
+        .btn-chaos-toggle {
+            background: #fef3c7 !important;
+            color: #b45309 !important;
+            border: 1px solid #f59e0b !important;
+        }
+
+        .btn-chaos-toggle.active {
+            background: #f59e0b !important;
+            color: white !important;
         }
 
         .work-area {
@@ -356,81 +361,7 @@
             outline: none;
             resize: none;
             font-family: inherit;
-        }
-
-        /* EYE TRAINER STYLING */
-        .eye-wrapper {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            background: #090d16;
-            color: #f8fafc;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .eye-controls {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            padding: 10px 15px;
-            background: #111827;
-            border-bottom: 1px solid #1f2937;
-            font-size: 13px;
-            z-index: 10;
-            overflow-x: auto;
-        }
-
-        .eye-controls select, .eye-controls button {
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: 1px solid #374151;
-            background: #1f2937;
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .eye-controls button.btn-start { background: #16a34a; border: none; }
-        .eye-controls button.btn-stop { background: #dc2626; border: none; }
-
-        .eye-arena {
-            flex-grow: 1;
-            position: relative;
-            overflow: hidden;
-            cursor: crosshair;
-        }
-
-        .eye-ball {
-            position: absolute;
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #38bdf8, #1d4ed8);
-            box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            font-weight: 900;
-            color: #ffffff;
-            user-select: none;
-            transition: transform 0.05s linear, background 0.4s ease;
-            transform: translate(-50%, -50%);
-        }
-
-        .eye-stats {
-            position: absolute;
-            bottom: 15px;
-            left: 15px;
-            background: rgba(17, 24, 39, 0.85);
-            padding: 8px 15px;
-            border-radius: 8px;
-            border: 1px solid #374151;
-            font-size: 13px;
-            font-weight: 600;
-            color: #38bdf8;
-            pointer-events: none;
+            transition: transform 0.15s ease-in-out, font-size 0.15s ease-in-out;
         }
 
         .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; }
@@ -491,6 +422,7 @@
             white-space: pre-line;
             overflow-y: auto;
             line-height: 1.8;
+            transition: transform 0.15s ease-in-out;
         }
 
         .layer-blue { color: var(--layer-blue); text-decoration: underline dashed var(--layer-blue); cursor: pointer; font-weight: 600; }
@@ -537,6 +469,7 @@
             line-height: 1.6;
             white-space: pre-wrap;
             color: #1e293b;
+            transition: transform 0.15s ease-in-out;
         }
 
         .video-hub-wrapper {
@@ -684,16 +617,6 @@
 
         .code-terminal-header { font-size: 11px; color: #6c7086; text-transform: uppercase; margin-bottom: 6px; font-weight: bold; }
 
-        .ai-canvas-wrapper { display: flex; flex-direction: column; height: 100%; background: #0f172a; color: #f8fafc; }
-        .ai-toolbar { display: flex; gap: 10px; align-items: center; padding: 10px 15px; background: #1e293b; border-bottom: 1px solid #334155; font-size: 13px; overflow-x: auto; }
-        .ai-toolbar input, .ai-toolbar select, .ai-toolbar button { padding: 6px 12px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #f8fafc; font-size: 12px; font-weight: 600; }
-        .ai-toolbar button { background: #2563eb; color: white; border: none; cursor: pointer; }
-        .ai-workspace { flex-grow: 1; position: relative; overflow: auto; background: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px; padding: 40px; display: flex; flex-wrap: wrap; gap: 20px; align-content: flex-start; }
-        .ai-card { background: #1e293b; border: 1px solid #475569; border-radius: 10px; width: 380px; min-height: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; position: absolute; cursor: move; }
-        .ai-card-header { padding: 10px 14px; background: #334155; border-radius: 9px 9px 0 0; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 13px; color: #38bdf8; }
-        .ai-card-body { padding: 14px; font-size: 13px; line-height: 1.6; color: #e2e8f0; overflow-y: auto; max-height: 400px; white-space: pre-wrap; user-select: text; }
-        .ai-card-close { cursor: pointer; color: #94a3b8; }
-
         @media (max-width: 768px) {
             body { flex-direction: column; }
             sidebar { width: 100%; height: 220px; border-right: none; border-bottom: 2px solid var(--border); }
@@ -726,13 +649,11 @@
 
             <div class="mode-tabs">
                 <button class="mode-btn active" id="btn-text" onclick="setMode('text')">📜 Заметки</button>
-                <button class="mode-btn" id="btn-eyetrainer" onclick="setMode('eyetrainer')">👁️ Тренажёр зрения</button>
                 <button class="mode-btn" id="btn-draw" onclick="setMode('draw')">🎨 Рисование</button>
                 <button class="mode-btn" id="btn-compress" onclick="setMode('compress')">⚡ Сократитель</button>
                 <button class="mode-btn" id="btn-pptx" onclick="setMode('pptx')">📊 Презентация</button>
                 <button class="mode-btn" id="btn-videohub" onclick="setMode('videohub')">🎬 Все видео</button>
                 <button class="mode-btn" id="btn-code" onclick="setMode('code')">💻 Код</button>
-                <button class="mode-btn" id="btn-aicanvas" onclick="setMode('aicanvas')">✨ AI Canvas</button>
             </div>
         </header>
 
@@ -754,44 +675,13 @@
             <button id="btnBold" onclick="toggleFormat('bold')"><b>B</b></button>
             <button id="btnItalic" onclick="toggleFormat('italic')"><i>I</i></button>
             <button id="btnUnderline" onclick="toggleFormat('underline')"><u>U</u></button>
-            <button class="btn-quick-eye" onclick="setMode('eyetrainer'); startEyeSession();">👁️ Быстрая разминка</button>
+            
+            <!-- ОРИГИНАЛЬНАЯ КНОПКА ТРЕНАЖЕРА (ХАОС И ПУЛЬСАЦИЯ ТЕКСТА) -->
+            <button id="btnChaos" class="btn-chaos-toggle" onclick="toggleChaos()">👁️ Хаос (Разминка)</button>
         </div>
 
         <div class="work-area">
-            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Ссылки на YouTube добавятся в вкладку 'Все видео' автоматически!"></textarea>
-
-            <div id="eyeTrainerEditor" class="eye-wrapper hidden">
-                <div class="eye-controls">
-                    <label>Траектория: 
-                        <select id="eyePattern" onchange="resetChaosState()">
-                            <option value="figure8">Восьмёрка (∞)</option>
-                            <option value="spiral">Спираль</option>
-                            <option value="chaos">Хаос (Перескоки)</option>
-                        </select>
-                    </label>
-                    <label>Скорость: 
-                        <select id="eyeSpeed">
-                            <option value="1">Медленно</option>
-                            <option value="2" selected>Нормально</option>
-                            <option value="3.5">Быстро</option>
-                        </select>
-                    </label>
-                    <label>Время: 
-                        <select id="eyeTimerVal">
-                            <option value="60">1 минута</option>
-                            <option value="120">2 минуты</option>
-                            <option value="180">3 минуты</option>
-                        </select>
-                    </label>
-                    <label><input type="checkbox" id="eyeGameMode"> Режим игры (Жми Пробел на "А")</label>
-                    <button class="btn-start" id="btnStartEye" onclick="startEyeSession()">▶️ Начать тренировку</button>
-                    <button class="btn-stop" onclick="stopEyeSession()">🛑 Стоп</button>
-                </div>
-                <div class="eye-arena" id="eyeArena" onclick="handleEyeArenaClick()">
-                    <div class="eye-ball" id="eyeBall">А</div>
-                    <div class="eye-stats" id="eyeStats">⏱️ Осталось: 00:00 | 🎯 Очки: 0</div>
-                </div>
-            </div>
+            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Включи '👁️ Хаос' сверху, чтобы текст начал пульсировать для разминки глаз!"></textarea>
 
             <div id="drawEditor" class="canvas-wrapper hidden">
                 <div class="canvas-tools">
@@ -854,21 +744,6 @@
                     <div id="codeOutput">Нажмите «▶️ Запустить», чтобы выполнить код...</div>
                 </div>
             </div>
-
-            <div id="aiCanvasEditor" class="ai-canvas-wrapper hidden">
-                <div class="ai-toolbar">
-                    <input type="password" id="geminiApiKey" placeholder="Введи Gemini API Key..." style="width: 180px;">
-                    <select id="aiPromptMode">
-                        <option value="examples">📚 Сгенерировать примеры по теме</option>
-                        <option value="solve">📐 Пошаговое решение задачи</option>
-                        <option value="summary">📝 Сделать краткий конспект</option>
-                        <option value="free">💬 Свободный запрос к ИИ</option>
-                    </select>
-                    <input type="text" id="aiPromptInput" placeholder="Введите тему или задачу..." style="flex-grow: 1;">
-                    <button onclick="generateAICard()">🚀 Сгенерировать</button>
-                </div>
-                <div class="ai-workspace" id="aiWorkspace"></div>
-            </div>
         </div>
 
         <div class="footer-bar">
@@ -924,12 +799,11 @@
                                 id: '1-1-1', name: 'Алгебра', type: 'bundle', icon: '🎒', collapsed: false, children: [
                                     {
                                         id: '1-1-1-1', name: 'Заметки', type: 'scroll', icon: '📜',
-                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nВидео для разминки: https://www.youtube.com/watch?v=dQw4w9WgXcQ', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
+                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nНажми "👁️ Хаос" в панели управления, чтобы текст на странице начал увеличиваться и уменьшаться для разминки глаз.', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
                                         canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
                                         codeSnippet: CODE_TEMPLATES.cpp,
                                         codeLang: 'cpp',
-                                        slides: [],
-                                        aiCards: []
+                                        slides: []
                                     }
                                 ]
                             }
@@ -968,20 +842,75 @@
         let isPanning = false, startX, startY;
         let currentSlides = [], currentSlideIdx = 0;
 
-        // FIXED EYE TRAINER ENGINE
-        let eyeAnimId = null;
-        let eyeTimerInterval = null;
-        let eyeTimeLeft = 60;
-        let eyeScore = 0;
-        let eyeAngle = 0;
-        let eyeCurrentChar = 'А';
-        let isEyeActive = false;
-        let targetChaosX = 0, targetChaosY = 0, currentChaosX = 0, currentChaosY = 0;
+        // CLASSIC CHAOS / EYE-TRAINER LOGIC (PULSATING TEXT)
+        let chaosInterval = null;
+        let isChaosActive = false;
+        let chaosStep = 0;
 
-        const EYE_COLORS = ['radial-gradient(circle at 30% 30%, #38bdf8, #1d4ed8)', 
-                            'radial-gradient(circle at 30% 30%, #4ade80, #15803d)', 
-                            'radial-gradient(circle at 30% 30%, #c084fc, #6b21a8)', 
-                            'radial-gradient(circle at 30% 30%, #fbbf24, #b45309)'];
+        function stopChaos() {
+            isChaosActive = false;
+            if (chaosInterval) {
+                clearInterval(chaosInterval);
+                chaosInterval = null;
+            }
+            
+            const btn = document.getElementById('btnChaos');
+            if (btn) btn.classList.remove('active');
+
+            // Reset transform for text editor and outputs
+            const editor = document.getElementById('textEditor');
+            const compressOutput = document.getElementById('outputBook');
+            const pptxSlide = document.getElementById('slideViewer');
+
+            if (editor) {
+                editor.style.transform = 'none';
+                editor.style.fontSize = document.getElementById('fontSize').value || '16px';
+            }
+            if (compressOutput) compressOutput.style.transform = 'none';
+            if (pptxSlide) pptxSlide.style.transform = 'none';
+        }
+
+        function toggleChaos() {
+            if (isChaosActive) {
+                stopChaos();
+            } else {
+                startChaos();
+            }
+        }
+
+        function startChaos() {
+            stopChaos(); // Purge old state
+
+            isChaosActive = true;
+            const btn = document.getElementById('btnChaos');
+            if (btn) btn.classList.add('active');
+
+            const editor = document.getElementById('textEditor');
+            const compressOutput = document.getElementById('outputBook');
+            const pptxSlide = document.getElementById('slideViewer');
+
+            const baseSize = parseInt(document.getElementById('fontSize').value) || 16;
+
+            chaosInterval = setInterval(() => {
+                if (!isChaosActive) return;
+
+                chaosStep += 0.15;
+                // Smooth sinus wave scale (0.85x to 1.3x)
+                const scale = 1 + Math.sin(chaosStep) * 0.2;
+                const shiftX = Math.cos(chaosStep * 0.7) * 6;
+                const shiftY = Math.sin(chaosStep * 0.5) * 4;
+
+                const transformStyle = `scale(${scale.toFixed(2)}) translate(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px)`;
+
+                if (currentMode === 'text' && editor) {
+                    editor.style.transform = transformStyle;
+                } else if (currentMode === 'compress' && compressOutput) {
+                    compressOutput.style.transform = transformStyle;
+                } else if (currentMode === 'pptx' && pptxSlide) {
+                    pptxSlide.style.transform = transformStyle;
+                }
+            }, 80);
+        }
 
         function updateCloudStatus(text) {
             const el = document.getElementById('syncStatus');
@@ -1151,8 +1080,7 @@
                 canvases: [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }],
                 codeSnippet: CODE_TEMPLATES.cpp,
                 codeLang: 'cpp',
-                slides: [],
-                aiCards: []
+                slides: []
             };
 
             if (!parentId) window.treeData.push(newNode);
@@ -1211,7 +1139,6 @@
             renderSubTabs();
             loadActivePageOrCanvas();
             renderSlide();
-            renderAICards();
         }
         window.openFile = openFile;
 
@@ -1344,26 +1271,19 @@
             saveCurrentContent();
             triggerCloudSync();
 
-            if (isEyeActive && mode !== 'eyetrainer') stopEyeSession();
-
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
 
             document.getElementById('textEditor').classList.add('hidden');
-            document.getElementById('eyeTrainerEditor').classList.add('hidden');
             document.getElementById('drawEditor').classList.add('hidden');
             document.getElementById('compressEditor').classList.add('hidden');
             document.getElementById('pptxEditor').classList.add('hidden');
             document.getElementById('videoHubEditor').classList.add('hidden');
             document.getElementById('codeEditor').classList.add('hidden');
-            document.getElementById('aiCanvasEditor').classList.add('hidden');
 
             if (mode === 'text') {
                 document.getElementById('textEditor').classList.remove('hidden');
-                document.getElementById('formatToolbar').classList.remove('hidden');
-            } else if (mode === 'eyetrainer') {
-                document.getElementById('eyeTrainerEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.remove('hidden');
             } else if (mode === 'compress') {
                 document.getElementById('compressEditor').classList.remove('hidden');
@@ -1379,10 +1299,6 @@
             } else if (mode === 'code') {
                 document.getElementById('codeEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.add('hidden');
-            } else if (mode === 'aicanvas') {
-                document.getElementById('aiCanvasEditor').classList.remove('hidden');
-                document.getElementById('formatToolbar').classList.add('hidden');
-                renderAICards();
             } else if (mode === 'draw') {
                 document.getElementById('drawEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.add('hidden');
@@ -1391,120 +1307,6 @@
             renderSubTabs();
             loadActivePageOrCanvas();
         }
-
-        // EYE TRAINER CLEAN ENGINE & FIX FOR CHAOS
-        function resetChaosState() {
-            targetChaosX = 0; targetChaosY = 0; currentChaosX = 0; currentChaosY = 0;
-        }
-
-        function startEyeSession() {
-            stopEyeSession(); // Always purge old timers before starting
-
-            isEyeActive = true;
-            eyeTimeLeft = parseInt(document.getElementById('eyeTimerVal').value) || 60;
-            eyeScore = 0;
-            eyeAngle = 0;
-            resetChaosState();
-
-            document.getElementById('btnStartEye').innerText = '🔄 Перезапустить';
-            updateEyeStatsUI();
-
-            const arena = document.getElementById('eyeArena');
-            const ball = document.getElementById('eyeBall');
-
-            let charChangeCounter = 0;
-            const alphabet = 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ';
-
-            eyeTimerInterval = setInterval(() => {
-                eyeTimeLeft--;
-                updateEyeStatsUI();
-                if (eyeTimeLeft <= 0) {
-                    stopEyeSession();
-                    alert(`🎉 Тренировка окончена! Вы набрали очков: ${eyeScore}`);
-                }
-            }, 1000);
-
-            function eyeLoop() {
-                if (!isEyeActive) return;
-
-                const speedMultiplier = parseFloat(document.getElementById('eyeSpeed').value) || 2;
-                eyeAngle += 0.02 * speedMultiplier;
-
-                const pattern = document.getElementById('eyePattern').value;
-                const w = arena.clientWidth - 100;
-                const h = arena.clientHeight - 100;
-                const cx = arena.clientWidth / 2;
-                const cy = arena.clientHeight / 2;
-
-                let x = cx, y = cy;
-
-                if (pattern === 'figure8') {
-                    x = cx + (Math.sin(eyeAngle) * w / 2.3);
-                    y = cy + (Math.sin(eyeAngle * 2) * h / 2.5);
-                } else if (pattern === 'spiral') {
-                    let r = (Math.sin(eyeAngle * 0.3) + 1.2) * (Math.min(w, h) / 3);
-                    x = cx + Math.cos(eyeAngle) * r;
-                    y = cy + Math.sin(eyeAngle) * r;
-                } else if (pattern === 'chaos') {
-                    if (Math.abs(targetChaosX - currentChaosX) < 5 && Math.abs(targetChaosY - currentChaosY) < 5) {
-                        targetChaosX = 50 + Math.random() * w;
-                        targetChaosY = 50 + Math.random() * h;
-                    }
-                    currentChaosX += (targetChaosX - currentChaosX) * (0.05 * speedMultiplier);
-                    currentChaosY += (targetChaosY - currentChaosY) * (0.05 * speedMultiplier);
-                    x = currentChaosX;
-                    y = currentChaosY;
-                }
-
-                let scale = 0.6 + Math.sin(eyeAngle * 1.5) * 0.4;
-                ball.style.left = `${x}px`;
-                ball.style.top = `${y}px`;
-                ball.style.transform = `translate(-50%, -50%) scale(${scale})`;
-
-                charChangeCounter++;
-                if (charChangeCounter % Math.floor(60 / speedMultiplier) === 0) {
-                    eyeCurrentChar = alphabet[Math.floor(Math.random() * alphabet.length)];
-                    ball.innerText = eyeCurrentChar;
-                    ball.style.background = EYE_COLORS[Math.floor(Math.random() * EYE_COLORS.length)];
-                }
-
-                eyeAnimId = requestAnimationFrame(eyeLoop);
-            }
-
-            eyeLoop();
-        }
-
-        function stopEyeSession() {
-            isEyeActive = false;
-            if (eyeAnimId) { cancelAnimationFrame(eyeAnimId); eyeAnimId = null; }
-            if (eyeTimerInterval) { clearInterval(eyeTimerInterval); eyeTimerInterval = null; }
-            document.getElementById('btnStartEye').innerText = '▶️ Начать тренировку';
-        }
-
-        function updateEyeStatsUI() {
-            const mins = Math.floor(eyeTimeLeft / 60);
-            const secs = eyeTimeLeft % 60;
-            const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            document.getElementById('eyeStats').innerText = `⏱️ Осталось: ${formattedTime} | 🎯 Очки: ${eyeScore}`;
-        }
-
-        function handleEyeArenaClick() {
-            if (!isEyeActive) return;
-            const isGameMode = document.getElementById('eyeGameMode').checked;
-            if (isGameMode && eyeCurrentChar === 'А') {
-                eyeScore += 10;
-                updateEyeStatsUI();
-                eyeCurrentChar = '✓';
-                document.getElementById('eyeBall').innerText = '✓';
-            }
-        }
-
-        window.addEventListener('keydown', (e) => {
-            if (currentMode === 'eyetrainer' && e.code === 'Space') {
-                e.preventDefault();
-                handleEyeArenaClick();
-            }
-        });
 
         // VIDEO HUB SCANNER
         function renderVideoHub() {
@@ -1622,87 +1424,6 @@
             link.href = URL.createObjectURL(blob);
             link.download = `main.${extMap[lang] || 'txt'}`;
             link.click();
-        }
-
-        const geminiKeyInput = document.getElementById('geminiApiKey');
-        geminiKeyInput.value = localStorage.getItem('studyhub_gemini_key') || '';
-        geminiKeyInput.addEventListener('change', () => localStorage.setItem('studyhub_gemini_key', geminiKeyInput.value.trim()));
-
-        async function generateAICard() {
-            const apiKey = geminiKeyInput.value.trim();
-            const mode = document.getElementById('aiPromptMode').value;
-            const promptText = document.getElementById('aiPromptInput').value.trim();
-
-            if (!apiKey || !promptText) { alert('Введи API key и промпт!'); return; }
-
-            const file = findNode(window.treeData, window.activeFileId);
-            if (!file) return;
-            if (!file.aiCards) file.aiCards = [];
-
-            const tempId = 'card_' + Date.now();
-            file.aiCards.push({ id: tempId, title: promptText.substring(0, 20) + '...', text: "⏳ ИИ генерирует...", x: 30, y: 30 });
-            renderAICards();
-
-            const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-            for (let model of models) {
-                try {
-                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: `${mode}: ${promptText}` }] }] })
-                    });
-                    const data = await res.json();
-                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                        const card = file.aiCards.find(c => c.id === tempId);
-                        if (card) { card.text = data.candidates[0].content.parts[0].text; renderAICards(); saveToCloud(); }
-                        break;
-                    }
-                } catch(e) {}
-            }
-        }
-
-        function renderAICards() {
-            const workspace = document.getElementById('aiWorkspace');
-            workspace.innerHTML = '';
-            const file = findNode(window.treeData, window.activeFileId);
-            if (!file || !file.aiCards) return;
-
-            file.aiCards.forEach(card => {
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'ai-card';
-                cardDiv.style.left = `${card.x}px`;
-                cardDiv.style.top = `${card.y}px`;
-                cardDiv.innerHTML = `
-                    <div class="ai-card-header"><span>${card.title}</span><span class="ai-card-close" onclick="removeAICard('${card.id}')">✕</span></div>
-                    <div class="ai-card-body">${card.text}</div>
-                `;
-                makeDraggableCard(cardDiv, card);
-                workspace.appendChild(cardDiv);
-            });
-        }
-
-        function removeAICard(id) {
-            const file = findNode(window.treeData, window.activeFileId);
-            if (!file || !file.aiCards) return;
-            file.aiCards = file.aiCards.filter(c => c.id !== id);
-            renderAICards();
-            saveToCloud();
-        }
-
-        function makeDraggableCard(element, cardObj) {
-            let p1=0, p2=0, p3=0, p4=0;
-            element.querySelector('.ai-card-header').onmousedown = (e) => {
-                e.preventDefault();
-                p3 = e.clientX; p4 = e.clientY;
-                document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; saveToCloud(); };
-                document.onmousemove = (e) => {
-                    p1 = p3 - e.clientX; p2 = p4 - e.clientY;
-                    p3 = e.clientX; p4 = e.clientY;
-                    element.style.top = (element.offsetTop - p2) + "px";
-                    element.style.left = (element.offsetLeft - p1) + "px";
-                    cardObj.x = element.offsetLeft - p1; cardObj.y = element.offsetTop - p2;
-                };
-            };
         }
 
         function openModal(nodeId, e) {
