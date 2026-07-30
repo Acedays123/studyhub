@@ -333,6 +333,7 @@
             background: #fef3c7 !important;
             color: #b45309 !important;
             border: 1px solid #f59e0b !important;
+            margin-left: auto;
         }
 
         .btn-chaos-toggle.active {
@@ -349,6 +350,7 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            transition: transform 0.15s ease-in-out;
         }
 
         textarea {
@@ -361,7 +363,6 @@
             outline: none;
             resize: none;
             font-family: inherit;
-            transition: transform 0.15s ease-in-out, font-size 0.15s ease-in-out;
         }
 
         .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; }
@@ -422,7 +423,6 @@
             white-space: pre-line;
             overflow-y: auto;
             line-height: 1.8;
-            transition: transform 0.15s ease-in-out;
         }
 
         .layer-blue { color: var(--layer-blue); text-decoration: underline dashed var(--layer-blue); cursor: pointer; font-weight: 600; }
@@ -469,7 +469,6 @@
             line-height: 1.6;
             white-space: pre-wrap;
             color: #1e293b;
-            transition: transform 0.15s ease-in-out;
         }
 
         .video-hub-wrapper {
@@ -676,12 +675,12 @@
             <button id="btnItalic" onclick="toggleFormat('italic')"><i>I</i></button>
             <button id="btnUnderline" onclick="toggleFormat('underline')"><u>U</u></button>
             
-            <!-- ОРИГИНАЛЬНАЯ КНОПКА ТРЕНАЖЕРА (ХАОС И ПУЛЬСАЦИЯ ТЕКСТА) -->
-            <button id="btnChaos" class="btn-chaos-toggle" onclick="toggleChaos()">👁️ Хаос (Разминка)</button>
+            <!-- КНОПКА ГЛОБАЛЬНОЙ ПУЛЬСАЦИИ -->
+            <button id="btnChaos" class="btn-chaos-toggle" onclick="toggleChaos()">👁️ Разминка (Пульсация)</button>
         </div>
 
-        <div class="work-area">
-            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Включи '👁️ Хаос' сверху, чтобы текст начал пульсировать для разминки глаз!"></textarea>
+        <div class="work-area" id="workArea">
+            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Включи '👁️ Разминка' сверху, чтобы всё содержимое плавно увеличивалось и уменьшалось для снятия напряжения глаз!"></textarea>
 
             <div id="drawEditor" class="canvas-wrapper hidden">
                 <div class="canvas-tools">
@@ -799,7 +798,7 @@
                                 id: '1-1-1', name: 'Алгебра', type: 'bundle', icon: '🎒', collapsed: false, children: [
                                     {
                                         id: '1-1-1-1', name: 'Заметки', type: 'scroll', icon: '📜',
-                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nНажми "👁️ Хаос" в панели управления, чтобы текст на странице начал увеличиваться и уменьшаться для разминки глаз.', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
+                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nНажми "👁️ Разминка" в панели сверху, чтобы включить плавающую пульсацию текста во всех вкладках.', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
                                         canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
                                         codeSnippet: CODE_TEMPLATES.cpp,
                                         codeLang: 'cpp',
@@ -842,7 +841,7 @@
         let isPanning = false, startX, startY;
         let currentSlides = [], currentSlideIdx = 0;
 
-        // CLASSIC CHAOS / EYE-TRAINER LOGIC (PULSATING TEXT)
+        // ГЛОБАЛЬНАЯ ЛОГИКА ТРЕНАЖЕРА ДЛЯ ГЛАЗ (ПУЛЬСАЦИЯ BCEГО РАБОЧЕГО ПОЛЯ)
         let chaosInterval = null;
         let isChaosActive = false;
         let chaosStep = 0;
@@ -857,17 +856,11 @@
             const btn = document.getElementById('btnChaos');
             if (btn) btn.classList.remove('active');
 
-            // Reset transform for text editor and outputs
-            const editor = document.getElementById('textEditor');
-            const compressOutput = document.getElementById('outputBook');
-            const pptxSlide = document.getElementById('slideViewer');
-
-            if (editor) {
-                editor.style.transform = 'none';
-                editor.style.fontSize = document.getElementById('fontSize').value || '16px';
+            // Сбрасываем трансформацию всей рабочей области к 100%
+            const workArea = document.getElementById('workArea');
+            if (workArea) {
+                workArea.style.transform = 'none';
             }
-            if (compressOutput) compressOutput.style.transform = 'none';
-            if (pptxSlide) pptxSlide.style.transform = 'none';
         }
 
         function toggleChaos() {
@@ -879,37 +872,27 @@
         }
 
         function startChaos() {
-            stopChaos(); // Purge old state
+            stopChaos(); // Сброс прошлого состояния
 
             isChaosActive = true;
             const btn = document.getElementById('btnChaos');
             if (btn) btn.classList.add('active');
 
-            const editor = document.getElementById('textEditor');
-            const compressOutput = document.getElementById('outputBook');
-            const pptxSlide = document.getElementById('slideViewer');
-
-            const baseSize = parseInt(document.getElementById('fontSize').value) || 16;
+            const workArea = document.getElementById('workArea');
 
             chaosInterval = setInterval(() => {
                 if (!isChaosActive) return;
 
-                chaosStep += 0.15;
-                // Smooth sinus wave scale (0.85x to 1.3x)
-                const scale = 1 + Math.sin(chaosStep) * 0.2;
-                const shiftX = Math.cos(chaosStep * 0.7) * 6;
-                const shiftY = Math.sin(chaosStep * 0.5) * 4;
+                chaosStep += 0.12;
+                // Плавная синусоида (увеличение / уменьшение масштаба от 0.88x до 1.25x)
+                const scale = 1 + Math.sin(chaosStep) * 0.18;
+                const shiftX = Math.cos(chaosStep * 0.6) * 5;
+                const shiftY = Math.sin(chaosStep * 0.4) * 3;
 
-                const transformStyle = `scale(${scale.toFixed(2)}) translate(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px)`;
-
-                if (currentMode === 'text' && editor) {
-                    editor.style.transform = transformStyle;
-                } else if (currentMode === 'compress' && compressOutput) {
-                    compressOutput.style.transform = transformStyle;
-                } else if (currentMode === 'pptx' && pptxSlide) {
-                    pptxSlide.style.transform = transformStyle;
+                if (workArea) {
+                    workArea.style.transform = `scale(${scale.toFixed(3)}) translate(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px)`;
                 }
-            }, 80);
+            }, 75);
         }
 
         function updateCloudStatus(text) {
