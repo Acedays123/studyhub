@@ -17,7 +17,7 @@
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY", // Укажите ваш API Key
+            apiKey: "YOUR_FIREBASE_API_KEY",
             authDomain: "studyhub-e9c6c.firebaseapp.com",
             projectId: "studyhub-e9c6c",
             storageBucket: "studyhub-e9c6c.firebasestorage.app",
@@ -373,9 +373,24 @@
             font-family: inherit;
             transition: transform 0.1s linear;
             transform-origin: center center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
-        .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; }
+        /* Наложенный Canvas поверх текста */
+        .overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .canvas-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; z-index: 3; }
         .canvas-tools {
             padding: 8px 12px;
             background: var(--bg-main);
@@ -399,8 +414,7 @@
             position: absolute; 
             top: 0; 
             left: 0; 
-            background: #ffffff; 
-            box-shadow: 0 0 25px rgba(0,0,0,0.15); 
+            background: transparent;
             transform-origin: 0 0;
         }
 
@@ -410,6 +424,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            z-index: 3;
         }
 
         .compressor-legend {
@@ -447,6 +462,7 @@
             padding: 15px;
             gap: 10px;
             background: #f8fafc;
+            z-index: 3;
         }
 
         .pptx-controls {
@@ -487,6 +503,7 @@
             overflow-y: auto;
             background: #0f172a;
             color: white;
+            z-index: 3;
         }
 
         .video-grid {
@@ -572,6 +589,7 @@
             height: 100%;
             background: #1e1e2e;
             color: #cdd6f4;
+            z-index: 3;
         }
 
         .code-toolbar {
@@ -626,7 +644,7 @@
 
         .code-terminal-header { font-size: 11px; color: #6c7086; text-transform: uppercase; margin-bottom: 6px; font-weight: bold; }
 
-        .ai-canvas-wrapper { display: flex; flex-direction: column; height: 100%; background: #0f172a; color: #f8fafc; }
+        .ai-canvas-wrapper { display: flex; flex-direction: column; height: 100%; background: #0f172a; color: #f8fafc; z-index: 3; }
         .ai-toolbar { display: flex; gap: 10px; align-items: center; padding: 10px 15px; background: #1e293b; border-bottom: 1px solid #334155; font-size: 13px; overflow-x: auto; }
         .ai-toolbar input, .ai-toolbar select, .ai-toolbar button { padding: 6px 12px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #f8fafc; font-size: 12px; font-weight: 600; }
         .ai-toolbar button { background: #2563eb; color: white; border: none; cursor: pointer; }
@@ -680,21 +698,24 @@
         <div class="sub-tabs-bar" id="subTabsBar"></div>
 
         <div class="format-toolbar" id="formatToolbar">
-            <select id="fontFamily" onchange="applyStyle()">
-                <option value="'Segoe UI', sans-serif">Segoe UI</option>
-                <option value="Arial, sans-serif">Arial</option>
-                <option value="'Times New Roman', serif">Times New Roman</option>
+            <select id="fontFamily" onchange="applyStyleToSelection('font', this.value)">
+                <option value="" disabled selected>Шрифт</option>
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times New Roman</option>
                 <option value="monospace">Monospace</option>
             </select>
-            <select id="fontSize" onchange="applyStyle()">
+            <select id="fontSize" onchange="applyStyleToSelection('size', this.value)">
+                <option value="" disabled selected>Размер</option>
                 <option value="14px">14px</option>
-                <option value="16px" selected>16px</option>
+                <option value="16px">16px</option>
                 <option value="18px">18px</option>
                 <option value="22px">22px</option>
             </select>
-            <button id="btnBold" onclick="toggleFormat('bold')"><b>B</b></button>
-            <button id="btnItalic" onclick="toggleFormat('italic')"><i>I</i></button>
-            <button id="btnUnderline" onclick="toggleFormat('underline')"><u>U</u></button>
+            <button id="btnBold" onclick="applyFormatToSelection('bold')"><b>B</b></button>
+            <button id="btnItalic" onclick="applyFormatToSelection('italic')"><i>I</i></button>
+            <button id="btnUnderline" onclick="applyFormatToSelection('underline')"><u>U</u></button>
+            <button id="btnDrawOverlay" onclick="toggleDrawOverlayMode()">✏️ Рисовать поверх</button>
 
             <button class="eye-trainer-btn" id="btnEyeTrainer" onclick="toggleEyeTrainer()">👁️ Фокусировка (Зрение)</button>
         </div>
@@ -720,6 +741,7 @@
 
         <div class="work-area">
             <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Ссылки на YouTube добавятся в вкладку 'Все видео' автоматически!"></textarea>
+            <canvas id="textCanvasOverlay" class="overlay-canvas"></canvas>
 
             <div id="drawEditor" class="canvas-wrapper hidden">
                 <div class="canvas-tools">
@@ -852,7 +874,7 @@
                                 id: '1-1-1', name: 'Алгебра', type: 'bundle', icon: '🎒', collapsed: false, children: [
                                     {
                                         id: '1-1-1-1', name: 'Заметки', type: 'scroll', icon: '📜',
-                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nВидео для разминки: https://www.youtube.com/watch?v=dQw4w9WgXcQ', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
+                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nВыделяй текст для форматирования.\nВидео для разминки: https://www.youtube.com/watch?v=dQw4w9WgXcQ', overlayDraw: '' }],
                                         canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
                                         codeSnippet: CODE_TEMPLATES.cpp,
                                         codeLang: 'cpp',
@@ -891,6 +913,7 @@
         let currentMode = 'text';
         let editingNodeId = null;
         let saveDebounceTimer = null;
+        let isOverlayDrawActive = false;
 
         let canvasOffsetX = 0, canvasOffsetY = 0, canvasScale = 1;
         let isPanning = false, startX, startY;
@@ -919,6 +942,8 @@
 
             if (page) {
                 page.text = document.getElementById('textEditor').value;
+                const overlayCanvas = document.getElementById('textCanvasOverlay');
+                page.overlayDraw = overlayCanvas.toDataURL();
             }
         }
 
@@ -1067,7 +1092,7 @@
                 icon: type === 'scroll' ? '📜' : (type === 'bundle' ? '🎒' : '🧰'),
                 collapsed: false,
                 children: [],
-                pages: [{ id: 'p_' + Date.now(), name: 'Лист 1', text: '', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }],
+                pages: [{ id: 'p_' + Date.now(), name: 'Лист 1', text: '', overlayDraw: '' }],
                 canvases: [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }],
                 codeSnippet: CODE_TEMPLATES.cpp,
                 codeLang: 'cpp',
@@ -1114,7 +1139,7 @@
             if (!file) return;
 
             if (!file.pages || file.pages.length === 0) {
-                file.pages = [{ id: 'p_' + Date.now(), name: 'Лист 1', text: '', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" }];
+                file.pages = [{ id: 'p_' + Date.now(), name: 'Лист 1', text: '', overlayDraw: '' }];
             }
             if (!file.canvases || file.canvases.length === 0) {
                 file.canvases = [{ id: 'c_' + Date.now(), name: 'Холст 1', draw: '' }];
@@ -1177,7 +1202,7 @@
 
             if (type === 'page') {
                 const count = file.pages.length + 1;
-                const newPage = { id: 'p_' + Date.now(), name: `Лист ${count}`, text: '', isBold: false, isItalic: false, isUnderline: false, font: "'Segoe UI', sans-serif", size: "16px" };
+                const newPage = { id: 'p_' + Date.now(), name: `Лист ${count}`, text: '', overlayDraw: '' };
                 file.pages.push(newPage);
                 activePageId = newPage.id;
             } else {
@@ -1221,17 +1246,16 @@
                     activePageId = page.id;
                     const editor = document.getElementById('textEditor');
                     editor.value = page.text !== undefined ? page.text : '';
-                    editor.style.fontWeight = page.isBold ? 'bold' : 'normal';
-                    editor.style.fontStyle = page.isItalic ? 'italic' : 'normal';
-                    editor.style.textDecoration = page.isUnderline ? 'underline' : 'none';
-                    editor.style.fontFamily = page.font || "'Segoe UI', sans-serif";
-                    editor.style.fontSize = page.size || "16px";
 
-                    document.getElementById('btnBold').classList.toggle('active', !!page.isBold);
-                    document.getElementById('btnItalic').classList.toggle('active', !!page.isItalic);
-                    document.getElementById('btnUnderline').classList.toggle('active', !!page.isUnderline);
-                    document.getElementById('fontFamily').value = page.font || "'Segoe UI', sans-serif";
-                    document.getElementById('fontSize').value = page.size || "16px";
+                    const overlayCanvas = document.getElementById('textCanvasOverlay');
+                    const oCtx = overlayCanvas.getContext('2d');
+                    oCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+                    if (page.overlayDraw) {
+                        let img = new Image();
+                        img.onload = () => oCtx.drawImage(img, 0, 0);
+                        img.src = page.overlayDraw;
+                    }
                 }
             }
 
@@ -1271,6 +1295,7 @@
             document.getElementById(`btn-${mode}`).classList.add('active');
 
             document.getElementById('textEditor').classList.add('hidden');
+            document.getElementById('textCanvasOverlay').classList.add('hidden');
             document.getElementById('drawEditor').classList.add('hidden');
             document.getElementById('compressEditor').classList.add('hidden');
             document.getElementById('pptxEditor').classList.add('hidden');
@@ -1280,7 +1305,9 @@
 
             if (mode === 'text') {
                 document.getElementById('textEditor').classList.remove('hidden');
+                document.getElementById('textCanvasOverlay').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.remove('hidden');
+                resizeOverlayCanvas();
             } else if (mode === 'compress') {
                 document.getElementById('compressEditor').classList.remove('hidden');
                 document.getElementById('formatToolbar').classList.remove('hidden');
@@ -1306,6 +1333,104 @@
 
             renderSubTabs();
             loadActivePageOrCanvas();
+        }
+
+        // ================= ТАЧ И ОВЕРЛЕЙ-РИСОВАНИЕ ПОВЕРХ ТЕКСТА =================
+        const overlayCanvas = document.getElementById('textCanvasOverlay');
+        const oCtx = overlayCanvas.getContext('2d');
+        let overlayPainting = false;
+
+        function resizeOverlayCanvas() {
+            const editor = document.getElementById('textEditor');
+            if (editor) {
+                overlayCanvas.width = editor.clientWidth;
+                overlayCanvas.height = editor.clientHeight;
+                loadActivePageOrCanvas();
+            }
+        }
+        window.addEventListener('resize', resizeOverlayCanvas);
+
+        function toggleDrawOverlayMode() {
+            isOverlayDrawActive = !isOverlayDrawActive;
+            const btn = document.getElementById('btnDrawOverlay');
+            if (isOverlayDrawActive) {
+                btn.classList.add('active');
+                overlayCanvas.style.pointerEvents = 'auto';
+            } else {
+                btn.classList.remove('active');
+                overlayCanvas.style.pointerEvents = 'none';
+            }
+        }
+
+        overlayCanvas.addEventListener('mousedown', (e) => {
+            if (!isOverlayDrawActive) return;
+            overlayPainting = true;
+            oCtx.beginPath();
+            oCtx.moveTo(e.offsetX, e.offsetY);
+        });
+
+        overlayCanvas.addEventListener('mousemove', (e) => {
+            if (!overlayPainting || !isOverlayDrawActive) return;
+            oCtx.lineWidth = 3;
+            oCtx.lineCap = 'round';
+            oCtx.strokeStyle = '#ef4444'; // Красный маркер поверх заметок
+            oCtx.lineTo(e.offsetX, e.offsetY);
+            oCtx.stroke();
+        });
+
+        overlayCanvas.addEventListener('mouseup', () => {
+            if (overlayPainting) {
+                overlayPainting = false;
+                saveTextContent();
+                triggerCloudSync();
+            }
+        });
+
+        // ================= ВЫДЕЛЕННОЕ ФОРМАТИРОВАНИЕ ТЕКСТА =================
+        function applyFormatToSelection(type) {
+            const editor = document.getElementById('textEditor');
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const text = editor.value;
+
+            if (start === end) return; // Ничего не выделено
+
+            const sel = text.substring(start, end);
+            let replaced = sel;
+
+            if (type === 'bold') replaced = `**${sel}**`;
+            if (type === 'italic') replaced = `*${sel}*`;
+            if (type === 'underline') replaced = `<u>${sel}</u>`;
+
+            editor.value = text.substring(0, start) + replaced + text.substring(end);
+            editor.focus();
+            editor.setSelectionRange(start, start + replaced.length);
+            
+            saveTextContent();
+            triggerCloudSync();
+        }
+
+        function applyStyleToSelection(styleType, val) {
+            if (!val) return;
+            const editor = document.getElementById('textEditor');
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const text = editor.value;
+
+            if (start === end) return;
+
+            const sel = text.substring(start, end);
+            let replaced = sel;
+
+            if (styleType === 'font') replaced = `<font face="${val}">${sel}</font>`;
+            if (styleType === 'size') replaced = `<font size="${val}">${sel}</font>`;
+
+            editor.value = text.substring(0, start) + replaced + text.substring(end);
+            editor.focus();
+            editor.setSelectionRange(start, start + replaced.length);
+            
+            saveTextContent();
+            triggerCloudSync();
         }
 
         // EYE TRAINER LOGIC
@@ -1685,7 +1810,6 @@
         function generateBook() {
             const file = findNode(window.treeData, window.activeFileId);
             if (!file) return;
-            const page = file.pages.find(p => p.id === activePageId) || file.pages[0];
             let rawText = document.getElementById('textEditor').value;
             const outputBox = document.getElementById('outputBook');
             window.textDatabase = {}; let count = 0;
@@ -1713,27 +1837,6 @@
             } else {
                 el.innerText = data.full; el.className = data.type === 'blue' ? 'expanded-blue' : 'expanded-green';
             }
-        }
-
-        function toggleFormat(styleType) {
-            const file = findNode(window.treeData, window.activeFileId);
-            if (!file) return;
-            const page = file.pages.find(p => p.id === activePageId);
-            if (!page) return;
-            if (styleType === 'bold') page.isBold = !page.isBold;
-            if (styleType === 'italic') page.isItalic = !page.isItalic;
-            if (styleType === 'underline') page.isUnderline = !page.isUnderline;
-            loadActivePageOrCanvas(); saveToCloud();
-        }
-
-        function applyStyle() {
-            const file = findNode(window.treeData, window.activeFileId);
-            if (!file) return;
-            const page = file.pages.find(p => p.id === activePageId);
-            if (!page) return;
-            page.font = document.getElementById('fontFamily').value;
-            page.size = document.getElementById('fontSize').value;
-            loadActivePageOrCanvas(); saveToCloud();
         }
 
         document.getElementById('textEditor').addEventListener('input', () => {
@@ -1775,6 +1878,7 @@
 
         window.onload = async () => {
             renderTree(); openFile(window.activeFileId);
+            resizeOverlayCanvas();
             if (window.syncCloudOnStart) await window.syncCloudOnStart();
         };
     </script>
