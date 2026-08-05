@@ -450,6 +450,40 @@
             line-height: 1.8;
         }
 
+        /* Стиль карточек Сократителя / Active Recall */
+        .compressed-card {
+            background: #f1f5f9;
+            border-left: 4px solid var(--primary);
+            padding: 10px 14px;
+            margin: 8px 0;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            font-size: 14px;
+            position: relative;
+        }
+
+        .compressed-card .card-number {
+            font-weight: 800;
+            color: var(--primary);
+            margin-right: 6px;
+        }
+
+        .hidden-answer {
+            background: #cbd5e1;
+            color: transparent;
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .hidden-answer.revealed {
+            background: #dcfce7;
+            color: #15803d;
+            font-weight: 600;
+        }
+
         .layer-blue { color: var(--layer-blue); text-decoration: underline dashed var(--layer-blue); cursor: pointer; font-weight: 600; }
         .layer-green { color: var(--layer-green); text-decoration: underline dashed var(--layer-green); cursor: pointer; font-weight: 600; }
         .expanded-blue { text-decoration: none; font-style: italic; color: var(--layer-blue); font-weight: 500; }
@@ -740,7 +774,7 @@
         </div>
 
         <div class="work-area">
-            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Ссылки на YouTube добавятся в вкладку 'Все видео' автоматически!"></textarea>
+            <textarea id="textEditor" placeholder="Пиши конспект...&#10;&#10;Используй [Термин | Определение] для авто-генерации карточек в «Сократителе».&#10;Ссылки на YouTube добавятся в вкладку 'Все видео' автоматически!"></textarea>
             <canvas id="textCanvasOverlay" class="overlay-canvas"></canvas>
 
             <div id="drawEditor" class="canvas-wrapper hidden">
@@ -760,6 +794,7 @@
                 <div class="compressor-legend">
                     <div><span class="layer-blue">Слово</span> [описание]</div>
                     <div><span class="layer-green">(Сжатая фраза)</span> {оригинал}</div>
+                    <div><span class="hidden-answer">Нажми</span> [Термин | Определение]</div>
                 </div>
                 <div class="compressor-output" id="outputBook"></div>
             </div>
@@ -874,7 +909,7 @@
                                 id: '1-1-1', name: 'Алгебра', type: 'bundle', icon: '🎒', collapsed: false, children: [
                                     {
                                         id: '1-1-1-1', name: 'Заметки', type: 'scroll', icon: '📜',
-                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nВыделяй текст для форматирования.\nВидео для разминки: https://www.youtube.com/watch?v=dQw4w9WgXcQ', overlayDraw: '' }],
+                                        pages: [{ id: 'p1', name: 'Лист 1', text: 'Добро пожаловать в StudyHub!\n\nВыделяй текст для форматирования.\n[Функция | Зависимость одной переменной от другой]\n\nВидео для разминки: https://www.youtube.com/watch?v=dQw4w9WgXcQ', overlayDraw: '' }],
                                         canvases: [{ id: 'c1', name: 'Холст 1', draw: '' }],
                                         codeSnippet: CODE_TEMPLATES.cpp,
                                         codeLang: 'cpp',
@@ -1362,29 +1397,53 @@
             }
         }
 
-        overlayCanvas.addEventListener('mousedown', (e) => {
+        function getCanvasCoords(e, canvasEl) {
+            const rect = canvasEl.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startOverlayDraw(e) {
             if (!isOverlayDrawActive) return;
             overlayPainting = true;
+            const coords = getCanvasCoords(e, overlayCanvas);
             oCtx.beginPath();
-            oCtx.moveTo(e.offsetX, e.offsetY);
-        });
+            oCtx.moveTo(coords.x, coords.y);
+        }
 
-        overlayCanvas.addEventListener('mousemove', (e) => {
+        function moveOverlayDraw(e) {
             if (!overlayPainting || !isOverlayDrawActive) return;
+            const coords = getCanvasCoords(e, overlayCanvas);
             oCtx.lineWidth = 3;
             oCtx.lineCap = 'round';
-            oCtx.strokeStyle = '#ef4444'; // Красный маркер поверх заметок
-            oCtx.lineTo(e.offsetX, e.offsetY);
+            oCtx.strokeStyle = '#ef4444';
+            oCtx.lineTo(coords.x, coords.y);
             oCtx.stroke();
-        });
+        }
 
-        overlayCanvas.addEventListener('mouseup', () => {
+        function stopOverlayDraw() {
             if (overlayPainting) {
                 overlayPainting = false;
                 saveTextContent();
                 triggerCloudSync();
             }
-        });
+        }
+
+        overlayCanvas.addEventListener('mousedown', startOverlayDraw);
+        overlayCanvas.addEventListener('mousemove', moveOverlayDraw);
+        overlayCanvas.addEventListener('mouseup', stopOverlayDraw);
+
+        overlayCanvas.addEventListener('touchstart', (e) => { startOverlayDraw(e); e.preventDefault(); }, { passive: false });
+        overlayCanvas.addEventListener('touchmove', (e) => { moveOverlayDraw(e); e.preventDefault(); }, { passive: false });
+        overlayCanvas.addEventListener('touchend', stopOverlayDraw);
 
         // ================= ВЫДЕЛЕННОЕ ФОРМАТИРОВАНИЕ ТЕКСТА =================
         function applyFormatToSelection(type) {
@@ -1393,7 +1452,7 @@
             const end = editor.selectionEnd;
             const text = editor.value;
 
-            if (start === end) return; // Ничего не выделено
+            if (start === end) return;
 
             const sel = text.substring(start, end);
             let replaced = sel;
@@ -1807,22 +1866,37 @@
         function nextSlide() { if (currentSlideIdx < currentSlides.length - 1) { currentSlideIdx++; renderSlide(); } }
         function prevSlide() { if (currentSlideIdx > 0) { currentSlideIdx--; renderSlide(); } }
 
+        // генерация карточек Active Recall и Сократителя
         function generateBook() {
             const file = findNode(window.treeData, window.activeFileId);
             if (!file) return;
             let rawText = document.getElementById('textEditor').value;
             const outputBox = document.getElementById('outputBook');
-            window.textDatabase = {}; let count = 0;
+            window.textDatabase = {}; 
+            let count = 0;
+            let cardCount = 0;
 
             if (!rawText.trim()) { outputBox.innerHTML = '<i>Лист пуст.</i>'; return; }
 
-            rawText = rawText.replace(/([^\s\[\](){}]+)\s*\[([^\]]+)\]/g, (m, w, f) => {
-                count++; let id = `b_${count}`; window.textDatabase[id] = { short: w, full: f.trim(), type: 'blue' };
+            // 1. Преобразование карточек [Термин | Описание] в Active Recall блоки
+            rawText = rawText.replace(/\[([^|\]]+)\|([^\]]+)\]/g, (m, term, def) => {
+                cardCount++;
+                return `<div class="compressed-card"><span class="card-number">#${cardCount}</span> <strong>${term.trim()}:</strong> <span class="hidden-answer" onclick="this.classList.toggle('revealed')">${def.trim()}</span></div>`;
+            });
+
+            // 2. Обработка кликабельных синих слов: Слово [описание]
+            rawText = rawText.replace(/([^\s\[\](){}]+)\s*\[([^|\]]+)\]/g, (m, w, f) => {
+                count++; 
+                let id = `b_${count}`; 
+                window.textDatabase[id] = { short: w, full: f.trim(), type: 'blue' };
                 return `<span id="${id}" class="layer-blue" ondblclick="toggleLayer('${id}')">${w}</span>`;
             });
 
+            // 3. Обработка зеленых сокращений: (фраза) {оригинал}
             rawText = rawText.replace(/\(([^)]+)\)\s*\{([^}]+)\}/g, (m, sp, fp) => {
-                count++; let id = `g_${count}`; window.textDatabase[id] = { short: sp.trim(), full: fp.trim(), type: 'green' };
+                count++; 
+                let id = `g_${count}`; 
+                window.textDatabase[id] = { short: sp.trim(), full: fp.trim(), type: 'green' };
                 return `<span id="${id}" class="layer-green" ondblclick="toggleLayer('${id}')">${sp.trim()}</span>`;
             });
 
@@ -1832,6 +1906,7 @@
         function toggleLayer(id) {
             let el = document.getElementById(id);
             let data = window.textDatabase[id];
+            if (!el || !data) return;
             if (el.classList.contains('expanded-blue') || el.classList.contains('expanded-green')) {
                 el.innerText = data.short; el.className = data.type === 'blue' ? 'layer-blue' : 'layer-green';
             } else {
